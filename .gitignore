@@ -1,0 +1,42 @@
+# Gradle
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+local.properties
+
+# Android
+*.apk
+*.aab
+*.ap_
+*.dex
+captures/
+.externalNativeBuild/
+.cxx/
+
+# Signing material. A client secret or signing key must never be committed
+# (Rules.md TK-2, BE-7, SEC-02).
+*.jks
+*.keystore
+keystore.properties
+google-services.json
+
+# Secrets
+.env
+.env.*
+secrets.properties
+
+# IDE
+.idea/
+*.iml
+.kotlin/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Validation spikes are throwaway and must never merge (Rules.md BR-3).
+# Findings belong in docs/validation/, not in the working tree.
+spike-*/
+
+# Logs
+*.log

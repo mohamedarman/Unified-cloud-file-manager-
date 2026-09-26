@@ -1,0 +1,32 @@
+# Editor and ktlint settings. One file, so the build, the IDE, and CI agree.
+# CI runs `ktlintCheck` as a blocking gate, so a style disagreement that only
+# shows up in someone's editor is a build failure for them.
+
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 4
+
+[*.{kt,kts}]
+max_line_length = 120
+ktlint_standard_no-wildcard-imports = enabled
+ktlint_standard_filename = disabled
+
+# ktlint's default indent for continuations disagrees with ktlint's own wrapping
+# rules in 1.x, which produces a diff loop. Four spaces throughout is boring and
+# stable.
+ktlint_continuation_indent_size = 4
+
+[*.{yml,yaml,json,toml}]
+indent_size = 2
+
+[*.md]
+trim_trailing_whitespace = false
+
+[Makefile]
+indent_style = tab

@@ -1,0 +1,279 @@
+name: CI
+
+# Every gate here is BLOCKING (Architecture.md §27.2). A gate that warns is a
+# gate that gets merged past, so `continue-on-error` is used only where a failure
+# is genuinely informative rather than protective, and never on a correctness
+# gate.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  GRADLE_OPTS: -Dorg.gradle.jvmargs=-Xmx3g -Dfile.encoding=UTF-8
+
+jobs:
+  # -------------------------------------------------------------------------
+  # Fast structural gates. Run first and cheap: most rejections should happen
+  # here rather than after a full build.
+  # -------------------------------------------------------------------------
+  policy:
+    name: Policy and structure gates
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      # Required even here. Gradle configures every project by default, so the
+      # Android modules are configured - and AGP fails at CONFIGURATION time
+      # without an SDK, long before any of these gates run. Without this step
+      # this job would fail for a reason unrelated to what it checks.
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      # Domain purity: :domain must stay a pure Kotlin JVM module (L-1, L-2).
+      - name: Verify domain purity
+        run: ./gradlew :verifyDomainPurity
+
+      # Rules.md §1, §23 - contractual, therefore build-blocking. A banned
+      # storage claim is a legal and trust problem, not a wording preference.
+      - name: Scan for prohibited storage claims
+        run: ./gradlew :scanProhibitedPhrasing
+
+      # Rules.md TK-2, SEC-02 - no client secrets in the APK or the tree.
+      - name: Scan for secrets
+        run: ./gradlew :scanApkSecrets
+
+      - name: Verify Gradle wrapper is checksum-pinned
+        run: |
+          if ! grep -q '^distributionSha256Sum=' gradle/wrapper/gradle-wrapper.properties; then
+            echo "::error::gradle-wrapper.properties has no distributionSha256Sum."
+            echo "An unverified Gradle distribution is a supply-chain hole. See"
+            echo "docs/environment/toolchain.md §5 for how to complete it."
+            exit 1
+          fi
+
+  # -------------------------------------------------------------------------
+  # Build + static analysis.
+  # -------------------------------------------------------------------------
+  build:
+    name: Build and static analysis
+    needs: policy
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v3
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Build debug APK
+        run: ./gradlew assembleDebug
+
+      - name: Lint
+        run: ./gradlew lintDebug
+
+      - name: Detekt
+        run: ./gradlew detekt
+
+      - name: ktlint
+        run: ./gradlew ktlintCheck
+
+      - name: Upload lint report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lint-report
+          path: app/build/reports/lint-results-debug.html
+          retention-days: 7
+
+  # -------------------------------------------------------------------------
+  # Unit tests. The domain module runs as a plain JVM test task, so this needs
+  # no emulator and is the cheapest place to catch logic regressions.
+  # -------------------------------------------------------------------------
+  unit-test:
+    name: Unit tests
+    needs: policy
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v3
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Domain unit tests
+        run: ./gradlew :domain:test --rerun-tasks
+
+      - name: Module unit tests
+        run: ./gradlew testDebugUnitTest
+
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-test-reports
+          path: '**/build/reports/tests/**/*.html'
+          retention-days: 7
+
+  # -------------------------------------------------------------------------
+  # Room migrations. MIG-5: a schema change without a migration must fail here
+  # rather than in production. Requires the exported schema to be committed.
+  # -------------------------------------------------------------------------
+  migration:
+    name: Room migration check
+    needs: policy
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v3
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      # The Room schema does not exist yet - no @Entity has been written, which
+      # is Phase 6 work. This step distinguishes "not implemented yet" from
+      # "implemented but the schema was not committed", because those two must
+      # not look alike: the second is a data-loss bug, the first is simply early.
+      #
+      # Once the first entity lands, this stops being a special case and the
+      # drift check below becomes the whole gate.
+      - name: Check Room schema state
+        run: |
+          if [ -d data/schemas ] && [ -n "$(ls -A data/schemas 2>/dev/null)" ]; then
+            echo "Room schema present. The drift check below is now authoritative."
+          else
+            echo "::notice::No Room schema yet - no @Entity has been written (Phase 6)."
+            echo "The schema-drift check is NOT APPLICABLE, and is not counted as passing."
+            echo "It becomes a blocking failure as soon as the first entity is merged."
+          fi
+
+      - name: Generate schemas
+        run: ./gradlew :data:kspDebugKotlin
+
+      - name: Check for uncommitted schema drift
+        run: |
+          if [ -d data/schemas ] && [ -n "$(ls -A data/schemas 2>/dev/null)" ]; then
+            if [ -n "$(git status --porcelain data/schemas)" ]; then
+              echo "::error::Room schema changed without being committed."
+              git --no-pager diff data/schemas
+              echo "Run :data:kspDebugKotlin locally and commit data/schemas."
+              exit 1
+            fi
+            echo "No schema drift."
+          else
+            echo "Skipping drift check - no schema exists yet."
+          fi
+
+      # Migration *tests* are wired when the schema reaches version 2, at which
+      # point MigrationTestHelper asserts that every version has a migration.
+      # There is nothing to assert at version 1, and a check that reports success
+      # without checking anything is worse than no check.
+      - name: Note on migration coverage
+        run: |
+          echo "Schema is at version 1. No migration paths exist to verify yet."
+
+  # -------------------------------------------------------------------------
+  # Instrumented tests. Separate job because it needs an emulator, and kept off
+  # the critical path for the same reason.
+  #
+  # NOTE: no job here contacts the live Drive API. Provider tests run against
+  # recorded, sanitised responses and scripted failures (Rules.md TS-3).
+  # -------------------------------------------------------------------------
+  instrumented:
+    name: Instrumented tests
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v3
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
+            | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Run instrumented tests
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          arch: x86_64
+          script: ./gradlew connectedDebugAndroidTest
+          disable-animations: true
+
+      - name: Upload reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: instrumented-reports
+          path: '**/build/reports/androidTests/**'
+          retention-days: 7
+
+  # -------------------------------------------------------------------------
+  # Merge gate. Nothing lands unless every job above is green.
+  # -------------------------------------------------------------------------
+  required:
+    name: All gates green
+    if: always()
+    needs: [policy, build, unit-test, migration, instrumented]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fail if any gate failed
+        env:
+          RESULTS: ${{ toJSON(needs) }}
+        run: |
+          echo "$RESULTS"
+          if echo "$RESULTS" | grep -q '"result": *"failure"'; then
+            echo "::error::At least one required gate failed. This branch is not mergeable."
+            exit 1
+          fi
+          echo "All required gates passed."
