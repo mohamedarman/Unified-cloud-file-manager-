@@ -1,0 +1,47 @@
+# Line endings: store LF in the repository, check out LF on every platform.
+#
+# This machine has core.autocrlf=true and no .gitattributes, which made
+# every fresh checkout rewrite source files to CRLF. That contradicts
+# .editorconfig (end_of_line = lf) and produced a 53-file warning on the
+# first commit. It also means the first person on macOS or Linux gets a
+# different working tree than the first person on Windows.
+#
+# `text=auto` lets Git detect; `eol=lf` forces LF in the working tree
+# regardless of the user's core.autocrlf setting.
+* text=auto eol=lf
+
+# Files that must never be line-ending normalized.
+#
+# The wrapper JAR is the important one: Git rewriting a byte inside
+# gradle-wrapper.jar produces a corrupt JAR and a "Could not validate
+# distribution" error that looks like a bad download rather than a
+# checkout problem.
+*.jar binary
+*.jks binary
+*.keystore binary
+*.apk binary
+*.aab binary
+*.png binary
+*.webp binary
+*.so binary
+*.9.png binary
+gradle/wrapper/gradle-wrapper.jar binary
+
+# Markdown: keep it LF too, but be explicit because the docs are
+# line-ending sensitive (cross-references span lines).
+*.md text eol=lf
+
+# Gradle/Kotlin/Java/SQL are all covered by `text=auto eol=lf` above.
+# Listing them is redundant but makes the intent greppable when someone
+# adds a new module and wonders whether the default is safe.
+*.kts text eol=lf
+*.kt text eol=lf
+*.java text eol=lf
+*.toml text eol=lf
+*.properties text eol=lf
+*.xml text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.json text eol=lf
+*.pro text eol=lf
+*.sql text eol=lf
