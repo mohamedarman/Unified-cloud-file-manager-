@@ -37,8 +37,8 @@ inline fun <T> Result<T>.onAppError(action: (AppError) -> Unit): Result<T> = app
 inline fun <T> appErrorCatching(block: () -> T): Result<T> =
     try {
         Result.success(block())
-    } catch (e: AppError) {
-        Result.failure(e)
+    } catch (e: Throwable) {
+        if (e is AppError) Result.failure(e) else throw e
     }
 
 /** The [AppError], or null when this is a success. */
