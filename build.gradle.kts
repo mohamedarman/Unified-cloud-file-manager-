@@ -252,6 +252,89 @@ val scanApkSecrets by tasks.registering {
     }
 }
 
-tasks.named("check") {
-    dependsOn(verifyDomainPurity, scanProhibitedPhrasing, scanApkSecrets)
+// ---------------------------------------------------------------------------
+// Source encoding - UTF-8, no BOM, and above all no NUL bytes
+// ---------------------------------------------------------------------------
+// This exists because of a real defect, not a hypothetical one.
+// `core/.../logging/Redactor.kt` carried a raw NUL byte inside a string literal
+// (a NUL used as a separator between the account id and the file id in a hash
+// input). Git classified the whole file as binary: it could not be diffed,
+// merged, or grepped, and the first commit recorded it as `Bin 0 -> 4555 bytes`
+// instead of 107 lines of source. The Kotlin was probably fine. Everything
+// around it silently was not.
+//
+// A NUL in source is invisible in an editor, survives review, and breaks tooling
+// in ways that look like unrelated problems. `.gitattributes` cannot catch it -
+// `text` normalisation does not remove NUL bytes, so the file stays binary in
+// the repository however the attributes are set. Only a byte-level check does.
+//
+// The BOM half is the same class of problem: Gradle's Kotlin compilation accepts
+// a BOM, but it defeats byte-offset tooling and has repeatedly caused
+// "invisible character" diffs in Kotlin projects.
+val verifySourceEncoding by tasks.registering {
+    group = "verification"
+    description = "Fails if a source file contains a NUL byte or a UTF-8 BOM."
+
+    val roots = listOf("app", "cloud", "core", "data", "domain")
+    val extensions = setOf("kt", "kts", "java", "xml", "md", "toml", "yml", "yaml", "json", "pro")
+    val excludedDirNames = setOf("build", ".git", ".gradle", "node_modules")
+
+    doLast {
+        val findings = mutableListOf<String>()
+
+        for (module in roots) {
+            val root = rootProject.projectDir.resolve(module).resolve("src")
+            if (!root.exists()) continue
+            root.walkTopDown()
+                .onEnter { it.name !in excludedDirNames }
+                .filter { it.isFile }
+                .filter { it.extension in extensions }
+                .forEach { file ->
+                    val bytes = file.readBytes()
+                    if (bytes.size >= 3 &&
+                        bytes[0] == 0xEF.toByte() &&
+                        bytes[1] == 0xBB.toByte() &&
+                        bytes[2] == 0xBF.toByte()
+                    ) {
+                        findings += "${file.relativeTo(rootProject.projectDir)}: starts with a UTF-8 BOM"
+                    }
+                    bytes.forEachIndexed { index, byte ->
+                        if (byte == 0.toByte()) {
+                            val offset = index
+                            findings += "${file.relativeTo(rootProject.projectDir)}: " +
+                                "NUL byte at offset $offset - git will treat this file as binary. " +
+                                "Use an escape (\\u0000), not a literal control character."
+                            return@forEachIndexed
+                        }
+                    }
+                }
+        }
+
+        if (findings.isNotEmpty()) {
+            throw GradleException(
+                "Source encoding violations:\n" + findings.joinToString("\n") { "  - $it" }
+            )
+        }
+    }
+}
+
+// The four policy gates above are registered on the ROOT project, so they need
+// a root `check` to hang from. The root applies no plugin, and no plugin
+// contributes a lifecycle task to a project that has none - so
+// `tasks.named("check")` here failed at configuration time with
+// "Task with name 'check' not found in root project".
+//
+// The alternative was `plugins { base }`, which does supply `check` - but it
+// also supplies `clean`, and this file already registers its own `clean` a few
+// lines up, so adopting it would mean deleting a working task to gain an
+// equivalent one. Registering `check` directly is the smaller change.
+//
+// Note that `./gradlew check` still fans out to every subproject's `check`,
+// which `configureKotlinQuality` has already wired to detekt and ktlint. So
+// this task adds the four policy gates; it does not replace the per-module
+// analysis.
+tasks.register("check") {
+    group = "verification"
+    description = "Runs the repository policy gates: domain purity, prohibited phrasing, secrets, source encoding."
+    dependsOn(verifyDomainPurity, scanProhibitedPhrasing, scanApkSecrets, verifySourceEncoding)
 }
