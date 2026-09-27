@@ -1,5 +1,8 @@
 package com.unifiedcloud.filemanager.domain.model
 
+import java.time.Instant
+import java.time.ZoneId
+
 /**
  * A stored revision of a file.
  *
@@ -33,8 +36,8 @@ data class Revision(
  * indistinguishable at exactly the moment the distinction matters.
  */
 fun Revision.describeTimestamp(): String =
-    java.time.Instant.ofEpochMilli(modifiedTimeMillis)
-        .atZone(java.time.ZoneId.systemDefault())
+    Instant.ofEpochMilli(modifiedTimeMillis)
+        .atZone(ZoneId.systemDefault())
         .toLocalDateTime()
         .toString()
         .replace('T', ' ')

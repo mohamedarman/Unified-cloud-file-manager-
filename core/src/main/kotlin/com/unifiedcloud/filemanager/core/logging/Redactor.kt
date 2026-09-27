@@ -33,11 +33,11 @@ object Redactor {
         // This is explicitly not a security primitive and must never be used as
         // one - the file id is not a secret, it is simply not for logs.
         var hash = -0x340d631b7bdddcdbL // 14695981039346656037
-        for (char in accountId.toString() + "\u0000" + fileId) {
+        for (char in accountId.toString() + IDENTITY_SEPARATOR + fileId) {
             hash = hash xor char.code.toLong()
             hash *= 0x100000001b3L
         }
-        return java.lang.Long.toHexString(hash).takeLast(12).padStart(12, '0')
+        return hash.toString(HEX_RADIX).takeLast(TAG_WIDTH).padStart(TAG_WIDTH, '0')
     }
 
     /**
@@ -104,4 +104,19 @@ object Redactor {
         Regex("""1//[A-Za-z0-9._-]{20,}"""),
         Regex("""GOCSPX-[A-Za-z0-9_-]{10,}"""),
     )
+
+    /**
+     * The separator between account id and file id in the hashed input.
+     *
+     * A NUL cannot occur in either component, so it keeps `("4", "2abc")` and
+     * `("42", "abc")` distinct - without it those two hash alike, and two
+     * different files in two different accounts would share a log tag.
+     */
+    private const val IDENTITY_SEPARATOR = "\u0000"
+
+    /** Radix 16. A tag is a correlation handle, not a number anyone does maths on. */
+    private const val HEX_RADIX = 16
+
+    /** 12 hex characters: ample for correlation, and short enough not to be an identifier. */
+    private const val TAG_WIDTH = 12
 }
