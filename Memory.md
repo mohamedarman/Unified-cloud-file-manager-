@@ -23,7 +23,15 @@ Everything before the entry dated **2026-09-26** in this log is **unrecoverable*
 - Every dead end. What was tried, what failed, and why the alternative was chosen.
 - Any measured value that was ever obtained - Drive API quotas, result caps, `q` semantics, `thumbnailLink` lifetimes, OEM test results.
 - Any user research finding beyond what `PRD.md` §29 records as a *plan* to test.
-- Any prototype or spike code. The repository has **zero git commits**.
+- Any prototype or spike code.
+
+**Correction, 2026-09-27.** The line above previously ended "The repository has
+**zero git commits**", which was true when written and is now false. The
+repository has commits, a wrapper, and a working toolchain; Gradle configures the
+build. **Nothing in it has ever been compiled, assembled, or tested.** Those are
+different facts and the second is the one that matters, so it is the one recorded
+in the blocker register (B-4). No code here has been shown to build, and no test
+here has ever run.
 
 **Nothing in this file is reconstructed or inferred.** Where a value is unknown it says `UNKNOWN` and stays that way until measured. Do not fill a gap from memory, from a blog post, or from Google's general documentation - `Architecture.md` §33.5.6 requires measurement, and `Rules.md` QD-1 enforces it.
 
@@ -222,6 +230,14 @@ The prohibited-phrasing scan (PS-1…PS-3), the APK secret scan (TK-2), and the 
 
 **The phrasing scan covers event names as well as strings**, because an analytics event named `unlimited_storage_purchased` is a banned claim whether or not a user ever sees it (PS-5).
 
+**Finding, 2026-09-27 — the detekt gate cannot currently pass.** `config/detekt/detekt.yml` sets `maxIssues: 0` with `MagicNumber` active and a short `ignoreNumbers` list, and **no `config/detekt/baseline.xml` exists**. A byte-level scan of the 27 tracked Kotlin files finds roughly 16 genuine `MagicNumber` violations in **7 pre-existing files** that predate the Phase 7 work: `1024` in `QuotaUsage.kt`, `pageSize: Int = 50` in `CloudProvider.kt`, `250` in `TransferRetryPolicyTest.kt`, and similar in `AccountIsolationMatrixTest.kt`, `Repositories.kt`, and `FileRefTest.kt`.
+
+    Consequence: `./gradlew check` is **expected** to be red on detekt, **for reasons that have nothing to do with the code being validated**. Per D-1.13 this is a real state that ought to be announced rather than left to be discovered.
+
+    **Status of that prediction: unconfirmed.** A JDK and a full Android SDK now exist (B-1…B-3 resolved 2026-09-27) and the build configures, but detekt has not been executed. The expectation above is a static reading of the config plus a byte-level scan, not an observed Gradle result. It must not be cited as a measured failure until `./gradlew detekt` has actually been run.
+
+**Not fixed here, deliberately.** Two fixes are available and they are not equivalent. Either add a baseline file, which buries the findings and lets them grow; or relax `MagicNumber` for test source sets and name the handful of main-source constants properly. The second is better but it edits pre-existing domain interfaces, and `pageSize = 50` is a design value rather than a smell - so it is a decision for an owner, not a side effect of a commit whose subject is Drive error mapping. **Left open, and it needs answering before `check` can ever go green.** The Phase 7 files added in this pass were verified clean against this rule.
+
 ---
 
 ### D-1.13 - A gate that cannot yet apply must say so, not report success
@@ -283,6 +299,173 @@ upload becomes two uploads.
 
 ---
 
+### D-1.15 - The `403` disambiguation is an input, and an unreadable `403` is `Unknown`
+
+**Date:** 2026-09-27 · **Phase:** 7 · **Status:** DECIDED — **fills a gap the spec does not cover**
+
+`Architecture.md` §11.1.3 and `Rules.md` ER-5 both require a `403` to be
+resolved by reading the provider's `reason`. Neither document says what to do
+when the reason cannot be read, and neither assigns Drive reason codes to
+`PermissionReason.FILE_NOT_SHARED` vs `SCOPE_INSUFFICIENT` — those two enum
+members exist only in `AppError.kt`, authored without spec text behind them.
+
+**Decision 1: the FILE_NOT_SHARED / SCOPE_INSUFFICIENT split is an input, not an
+inference.** Drive returns `insufficientPermissions` identically whether the file
+is unshared with the account or the app's grant is too narrow to attempt the
+operation. No amount of reading the response body separates them. Only the auth
+client can, because only it has read the real scope grant — so
+`DriveErrors.DriveOperationContext.grantedScopesSuffice` is supplied by the
+caller and the mapper branches on it.
+
+**The scope strings are deliberately absent from that context.** `Memory.md`
+D-1.5 records the exact scope string as UNKNOWN and defers it to Phase 0.
+Hard-coding a remembered scope string to make this work would be precisely the
+failure TK-5 and `Architecture.md` §33.5.6 exist to prevent. The auth layer
+compares the real grant against the operation's requirement and passes a verdict.
+
+**Decision 2: a `403` whose reason is unreadable maps to `AppError.Unknown`,
+not to a permission error and not to a rate limit.** This is the gap the docs
+leave open, and it was decided against the more obvious default.
+
+The reasoning, stated so it can be revisited: the documented harm of guessing
+wrong is ER-5's — "Treating a rate limit as a permission error produces an
+unactionable message and destroys user trust" — and the reverse mistake is
+telling someone to wait for a request that will never succeed. `Unknown` is
+never retried (`Architecture.md` §21.3, RT-6), so the refusal cannot become a
+retry storm either.
+
+**The cost, recorded rather than hidden:** a genuine permission denial whose body
+was stripped by a proxy occasionally renders as a generic error with a reference
+code. That is the cheaper mistake — a user who retries a reconnect is mildly
+annoyed, a user who waits on a permanent refusal has lost their afternoon. If
+real-world bodies turn out to be reliably parseable, this decision should be
+revisited with that evidence; it is not a permanent position.
+
+**What would reverse it.** A recorded sample of real Drive error bodies showing
+the reason is always present would justify narrowing the `Unknown` branch.
+
+---
+
+### D-1.16 - `QuotaGovernor` budgets are provisional, and carry a tripwire
+
+**Date:** 2026-09-27 · **Phase:** 7 · **Status:** DECIDED, PROVISIONAL
+
+`Architecture.md` §5 requires `QuotaGovernor` with per-account and global caps.
+**It specifies no numbers for either**, and `Rules.md` QD-1 requires real quotas
+to be read from the Cloud Console and measured, never hard-coded from memory.
+
+**Decision:** the numbers are our own conservative client-side ceilings, labelled
+as such, and they are explicitly **not** claims about what Drive will tolerate.
+The real per-project quota is UNKNOWN (V-06, Q-05).
+
+**The mechanism worth keeping:** `ProvisionalBudgets.ARE_MEASURED` is a `const
+false` that `QuotaGovernorTest` asserts is `false`. It records *provenance* in
+code rather than in a comment. When V-06 is answered and the numbers are derived
+from a real reading, that test fails and forces the constants, the comments, and
+§2 of this file to move together — so a derived number can never quietly inherit
+the authority of a measurement it never had.
+
+**Also decided:** the governor is **not** the token-refresh mutex. They are
+separate because they answer different questions — the mutex exists so
+concurrent operations *within* one account perform exactly one refresh (matrix
+case M10), while the governor bounds how many requests are in flight. One object
+doing both would either serialise all traffic to an account or permit concurrent
+refreshes, which is the M10 defect itself.
+
+---
+
+### D-1.17 - The token state machine is a pure function, in `:data`
+
+**Date:** 2026-09-27 · **Phase:** 8 · **Status:** DECIDED
+
+`Architecture.md` §7.3 specifies the token state machine and §5 places
+`AccountStateMachine.kt` in `data/.../data/account/` — **not** in `:cloud`, where
+a resume note expected it. `Architecture.md` is the source of truth for
+placement, so it was authored there. Nothing about it needs Android or a
+provider SDK, so it is unit-testable now either way, and moving a single
+dependency-free file later is trivial.
+
+**Decision: a pure `next(state, event)` function rather than a stateful
+machine.** SM-3 says entering `ReauthRequired` for account A does not change
+account B's state. With one instance per account that rule is enforced by
+remembering to be careful; with a pure function there is nowhere for A's state to
+be stored that B can read, so it holds without anyone doing anything. Same
+reasoning as D-1.11.
+
+**Also decided:** an unverified token is refused with its own
+`TransitionRefusal.LIVE_VERIFICATION_REQUIRED`, distinct from
+`NOT_PERMITTED_FROM_STATE`, because the first is a bug in the caller and the
+second is a normal consequence of ordering. SM-6 is enforced by the transition
+table rather than described in a comment.
+
+**Also decided:** `ConsentAbandoned` and `OperationCancelled` are separate events.
+The first moves the account to `DISCONNECTED`; the second transitions nothing
+from any state (SM-5, TK-9). Collapsing them is how a cancelled listing drops an
+account into `ReauthRequired` and looks like a revocation.
+
+---
+
+### D-1.18 - Source encoding is a build gate, because of a real defect
+
+**Date:** 2026-09-27 · **Phase:** 7 · **Status:** DECIDED
+
+`Redactor.kt` carried a **raw NUL byte** inside a string literal, used as the
+separator between the account id and the file id in a hash input. Git classified
+the file as binary: it could not be diffed, merged, or grepped, and the first
+commit recorded it as `Bin 0 -> 4555 bytes` rather than 107 lines of source.
+
+Two things about this are worth recording. First, `.gitattributes` **cannot**
+prevent it — `text` normalisation does not remove NUL bytes, so the file stays
+binary in the repository however the attributes are set. Only a byte-level check
+works. Second, the Kotlin was almost certainly fine; what was broken was
+everything around it, and nothing would have said so.
+
+**Decision:** `verifySourceEncoding` is a root Gradle task wired into `check`
+(per D-1.12), failing on any NUL byte or UTF-8 BOM in a source file. A NUL in
+source is invisible in an editor, survives review, and breaks tooling in ways
+that look like unrelated problems.
+
+**Also decided, as a consequence of finding it:** the separator is now the named
+constant `IDENTITY_SEPARATOR = "\u0000"` with the reason it exists recorded —
+a NUL cannot occur in either component, so it keeps `("4","2abc")` and
+`("42","abc")` distinct. Two different files in two different accounts sharing a
+log tag would have been an isolation-diagnosis defect (LG-3, AR-04).
+
+---
+
+### D-1.19 - `AppError` in code diverges from `Architecture.md` §21.1, and the code is canonical
+
+**Date:** 2026-09-27 · **Phase:** 7 · **Status:** DECIDED — **pre-existing divergence, now recorded**
+
+`Architecture.md` §21.1 sketches an `AppError` taxonomy. The implemented
+`AppError.kt` **does not match it**, and neither does §11.1.3, which uses a third
+set of names again (`AuthenticationError`, `PermissionError`, `RateLimitError`).
+Three documents, three incompatible sets.
+
+The implemented taxonomy is the one that is coherent, and it is what
+`TransferRetryPolicy`'s exhaustive `when` is written against. **The code is
+canonical; the prose is not.** `DriveErrors` maps into the code's taxonomy and
+adds no variants.
+
+**The cost, recorded rather than hidden:** `Rules.md` RT-6 names
+`InsufficientDeviceStorage`, `UnsupportedFileType`, `FileTooLarge`, and
+`IntegrityFailure` as members that must never be retried. **None of them exist
+in the implemented taxonomy.** Those error cases currently have nowhere to land,
+and PRD §19 assigns them user-facing copy (ERR-12, ERR-13, ERR-15). This is an
+open gap, not a resolved question.
+
+**Not done here, deliberately.** Adding the four missing variants would break
+`TransferRetryPolicy`'s exhaustive `when` and force a retry-policy decision for
+cases that have no Phase 12/13 implementation yet. That is real work with a
+design question in it, and it does not belong in a commit whose subject is Drive
+error mapping. **It should be its own decision.**
+
+**What would reverse it.** Nothing so far — but §21.1 and §11.1.3 should be
+reconciled to the implemented names at the next documentation pass, or a future
+implementer will read §21.1 and build the wrong thing.
+
+---
+
 ## 2. Measured values register
 
 **Empty by design.** Per `Rules.md` DC-3, a measured value is recorded here and hard-coded nowhere. Per `Rules.md` QD-1, quotas, caps, and semantics are **read from the source and measured** - never hard-coded from memory.
@@ -322,14 +505,14 @@ upload becomes two uploads.
 
 | # | Blocker | Blocks | Resolvable by |
 |---|---|---|---|
-| B-1 | No JDK installed | Phase 1 exit criterion; every build | Installing Temurin 17 |
-| B-2 | No Android SDK installed | Phase 1 exit criterion; B-3, B-4, B-5 | Installing SDK + accepting licences |
-| B-3 | No `ANDROID_HOME` / `ANDROID_SDK_ROOT` | All Gradle Android work | Environment variable |
-| B-4 | Zero git commits; nothing ever built or run | Confidence in all authored config | First successful build |
+| B-1 | **RESOLVED 2026-09-27.** Temurin 17.0.20.1 installed; `java -version` verified | — | Done. `C:\Program Files\Eclipse Adoptium\jdk-17.0.20.101-hotspot` |
+| B-2 | **RESOLVED 2026-09-27.** `cmdline-tools` 19.0, `platform-tools`, `platforms;android-35`, `build-tools;35.0.0` installed; all SDK licences accepted | — | Done |
+| B-3 | **RESOLVED 2026-09-27.** `ANDROID_HOME` and `ANDROID_SDK_ROOT` set at User scope; gitignored `local.properties` written with `sdk.dir` | — | Done. A fresh shell or a new agent session must read the User environment |
+| B-4 | **PARTIALLY LIFTED 2026-09-27.** Gradle 8.11.1 now configures this build successfully and the wrapper runs. **Still true: nothing has ever been compiled, assembled, or tested.** The configuration cache and the four policy gates have not been exercised, and no unit test has ever executed. Every version in `gradle/libs.versions.toml` remains an unverified pin and every Kotlin file remains unverified source | Confidence in all authored config and code | First successful compile and test run |
 | B-5 | No `gradle/verification-metadata.xml` | Dependency verification is **not** enforced (`Architecture.md` §27.2) | First dependency resolution, then commit |
 | B-6 | V-01 enquiry to Google unsent and unowned | **The product** | A human sending it |
 | B-7 | `Design.md` does not exist | UI work from Phase 9 onward | Authoring it |
-| B-8 | `gradle-wrapper.properties` has no `distributionSha256Sum` | The wrapper distribution is **not** checksum-verified. CI fails on this deliberately | Reading the official hash from `gradle.org/release-checksums/` |
+| B-8 | **RESOLVED 2026-09-27.** `distributionSha256Sum` is now set in `gradle-wrapper.properties` | — | Done. Value read from Gradle's own `gradle-8.11.1-bin.zip.sha256` and confirmed against the archive actually downloaded |
 | B-9 | Blocker IDs in `docs/environment/toolchain.md` §4 were written with a **different scheme** from this register | Cross-referencing a blocker between the two documents silently points at the wrong thing | Reconciled 2026-09-26 — see note below |
 
 ### Note on B-8
