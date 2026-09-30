@@ -13,7 +13,6 @@ import com.unifiedcloud.filemanager.domain.model.LocalAccountId
  * how a per-account bottleneck turns into a global stall.
  */
 sealed interface Admission {
-
     /** The request may proceed. The caller now owes exactly one [QuotaGovernor.release]. */
     data object Granted : Admission
 
@@ -52,7 +51,6 @@ enum class Refusal {
  * inheriting the authority of a measurement it never had.
  */
 object ProvisionalBudgets {
-
     /**
      * False, and asserted false by `QuotaGovernorTest`.
      *
@@ -227,21 +225,23 @@ class QuotaGovernor(
     }
 
     /** Requests currently in flight for one account. */
-    fun inFlightFor(accountId: LocalAccountId): Int = synchronized(lock) {
-        inFlightByAccount[accountId] ?: 0
-    }
+    fun inFlightFor(accountId: LocalAccountId): Int =
+        synchronized(lock) {
+            inFlightByAccount[accountId] ?: 0
+        }
 
     /** Requests currently in flight across all accounts. */
     fun inFlightTotal(): Int = synchronized(lock) { inFlightTotal }
 
     /** The whole picture, read at one instant. */
-    fun snapshot(): QuotaSnapshot = synchronized(lock) {
-        QuotaSnapshot(
-            inFlightTotal = inFlightTotal,
-            inFlightByAccount = inFlightByAccount.toMap(),
-            requestsInWindow = requestBudget.consumedInWindow(),
-        )
-    }
+    fun snapshot(): QuotaSnapshot =
+        synchronized(lock) {
+            QuotaSnapshot(
+                inFlightTotal = inFlightTotal,
+                inFlightByAccount = inFlightByAccount.toMap(),
+                requestsInWindow = requestBudget.consumedInWindow(),
+            )
+        }
 
     /**
      * Runs [block] with capacity reserved, releasing it however [block] ends.
@@ -251,7 +251,10 @@ class QuotaGovernor(
      * cancellation from leaking a slot - a leak here eventually refuses every
      * request on the device with no visible cause.
      */
-    suspend fun <T> withPermit(accountId: LocalAccountId, block: suspend () -> T): T? {
+    suspend fun <T> withPermit(
+        accountId: LocalAccountId,
+        block: suspend () -> T,
+    ): T? {
         if (tryAcquire(accountId) !is Admission.Granted) return null
         return try {
             block()
@@ -297,26 +300,28 @@ class RequestBudget(
      * True when the request may start. A false result is not an error and is not
      * retried: the caller surfaces partial results (SC-3) rather than waiting.
      */
-    fun tryConsume(): Boolean = synchronized(lock) {
-        val now = clock()
-        if (now - windowStart >= windowMillis) {
-            windowStart = now
-            consumed = 0
+    fun tryConsume(): Boolean =
+        synchronized(lock) {
+            val now = clock()
+            if (now - windowStart >= windowMillis) {
+                windowStart = now
+                consumed = 0
+            }
+            if (consumed >= requestsPerWindow) {
+                return@synchronized false
+            }
+            consumed++
+            true
         }
-        if (consumed >= requestsPerWindow) {
-            return@synchronized false
-        }
-        consumed++
-        true
-    }
 
     /** Requests charged in the current window. */
     fun consumedInWindow(): Int = synchronized(lock) { consumed }
 
     /** Milliseconds until the current window rolls over. */
-    fun millisUntilRefresh(): Long = synchronized(lock) {
-        (windowStart + windowMillis - clock()).coerceAtLeast(0L)
-    }
+    fun millisUntilRefresh(): Long =
+        synchronized(lock) {
+            (windowStart + windowMillis - clock()).coerceAtLeast(0L)
+        }
 
     private companion object {
         const val NANOS_PER_MILLI = 1_000_000L

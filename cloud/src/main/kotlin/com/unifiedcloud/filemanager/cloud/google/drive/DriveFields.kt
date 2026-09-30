@@ -24,7 +24,6 @@ package com.unifiedcloud.filemanager.cloud.google.drive
  * unmeasured optimisation in the opposite direction.
  */
 object DriveFields {
-
     /**
      * Fields for a `files.list` response.
      *
@@ -38,25 +37,26 @@ object DriveFields {
      * bearer-adjacent, so it is never logged and never treated as durable. Its
      * lifetime is unmeasured (V-08, Q-07).
      */
-    const val FILE_LIST = "nextPageToken,files(" +
-        "id," +
-        "name," +
-        "mimeType," +
-        "size," +
-        "modifiedTime," +
-        "createdTime," +
-        "thumbnailLink," +
-        "webViewLink," +
-        "parents," +
-        "trashed," +
-        "starred," +
-        "ownedByMe," +
-        "driveId," +
-        "capabilities/canRename," +
-        "capabilities/canTrash," +
-        "capabilities/canDownload," +
-        "capabilities/canShare" +
-        ")"
+    const val FILE_LIST =
+        "nextPageToken,files(" +
+            "id," +
+            "name," +
+            "mimeType," +
+            "size," +
+            "modifiedTime," +
+            "createdTime," +
+            "thumbnailLink," +
+            "webViewLink," +
+            "parents," +
+            "trashed," +
+            "starred," +
+            "ownedByMe," +
+            "driveId," +
+            "capabilities/canRename," +
+            "capabilities/canTrash," +
+            "capabilities/canDownload," +
+            "capabilities/canShare" +
+            ")"
 
     /**
      * Fields for a single `files.get`.
@@ -66,25 +66,26 @@ object DriveFields {
      * `capabilities()` rather than a hardcoded list (`Rules.md` PC-7), which is
      * what makes a forced scope downgrade degrade instead of break.
      */
-    const val FILE_METADATA = "files(" +
-        "id," +
-        "name," +
-        "mimeType," +
-        "size," +
-        "modifiedTime," +
-        "createdTime," +
-        "thumbnailLink," +
-        "webViewLink," +
-        "parents," +
-        "trashed," +
-        "starred," +
-        "ownedByMe," +
-        "driveId," +
-        "capabilities/canRename," +
-        "capabilities/canTrash," +
-        "capabilities/canDownload," +
-        "capabilities/canShare" +
-        ")"
+    const val FILE_METADATA =
+        "files(" +
+            "id," +
+            "name," +
+            "mimeType," +
+            "size," +
+            "modifiedTime," +
+            "createdTime," +
+            "thumbnailLink," +
+            "webViewLink," +
+            "parents," +
+            "trashed," +
+            "starred," +
+            "ownedByMe," +
+            "driveId," +
+            "capabilities/canRename," +
+            "capabilities/canTrash," +
+            "capabilities/canDownload," +
+            "capabilities/canShare" +
+            ")"
 
     /**
      * Fields for `about`, per `Architecture.md` §11.1.
@@ -134,28 +135,29 @@ object DriveFields {
      * runtime cost on the request path - it is intended for tests and for a
      * debug assertion, not for every call in production.
      */
-    val ALLOWED: Set<String> = setOf(
-        "nextPageToken",
-        "id",
-        "name",
-        "mimeType",
-        "size",
-        "modifiedTime",
-        "createdTime",
-        "thumbnailLink",
-        "webViewLink",
-        "parents",
-        "trashed",
-        "starred",
-        "ownedByMe",
-        "driveId",
-        "capabilities/canRename",
-        "capabilities/canTrash",
-        "capabilities/canDownload",
-        "capabilities/canShare",
-        "user",
-        "storageQuota",
-    )
+    val ALLOWED: Set<String> =
+        setOf(
+            "nextPageToken",
+            "id",
+            "name",
+            "mimeType",
+            "size",
+            "modifiedTime",
+            "createdTime",
+            "thumbnailLink",
+            "webViewLink",
+            "parents",
+            "trashed",
+            "starred",
+            "ownedByMe",
+            "driveId",
+            "capabilities/canRename",
+            "capabilities/canTrash",
+            "capabilities/canDownload",
+            "capabilities/canShare",
+            "user",
+            "storageQuota",
+        )
 
     /**
      * Fails if [fields] requests anything outside [ALLOWED].
@@ -186,9 +188,10 @@ object DriveFields {
      * be used somewhere it should not be.
      */
     internal fun parseFields(fields: String): Set<String> {
-        val unwrapped = fields
-            .replace(OPEN_FILES, "")
-            .replace(CLOSE_FILES, "")
+        val unwrapped =
+            fields
+                .replace(OPEN_FILES, "")
+                .replace(CLOSE_FILES, "")
         return unwrapped
             .split(',')
             .map { it.trim() }

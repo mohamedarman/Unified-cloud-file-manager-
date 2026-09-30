@@ -67,47 +67,33 @@ data class FileMetadataEntity(
     @PrimaryKey(autoGenerate = true)
     @ColumnInfo(name = "local_id")
     val localId: Long = 0,
-
     @ColumnInfo(name = "account_id")
     val accountId: Long,
-
     /** Provider-issued and opaque. Never parsed, never generated (FI-05). */
     @ColumnInfo(name = "file_id")
     val fileId: String,
-
     @ColumnInfo(name = "name")
     val name: String,
-
     @ColumnInfo(name = "mime_type")
     val mimeType: String,
-
     @ColumnInfo(name = "size_bytes")
     val sizeBytes: Long?,
-
     @ColumnInfo(name = "modified_at")
     val modifiedAt: Long?,
-
     @ColumnInfo(name = "is_folder")
     val isFolder: Boolean,
-
     @ColumnInfo(name = "parent_file_id")
     val parentFileId: String?,
-
     @ColumnInfo(name = "is_shared")
     val isShared: Boolean,
-
     @ColumnInfo(name = "is_owned_by_user")
     val isOwnedByUser: Boolean,
-
     @ColumnInfo(name = "is_starred")
     val isStarred: Boolean,
-
     @ColumnInfo(name = "trashed")
     val trashed: Boolean,
-
     @ColumnInfo(name = "is_offline_available")
     val isOfflineAvailable: Boolean = false,
-
     /**
      * How this row's freshness relates to the provider.
      *
@@ -149,13 +135,10 @@ data class FileMetadataEntity(
 data class SyncStateEntity(
     @ColumnInfo(name = "account_id")
     val accountId: Long,
-
     @ColumnInfo(name = "scope_key")
     val scopeKey: String,
-
     @ColumnInfo(name = "next_page_token")
     val nextPageToken: String?,
-
     @ColumnInfo(name = "last_synced_at")
     val lastSyncedAt: Long?,
 )
@@ -185,10 +168,8 @@ data class SyncStateEntity(
 data class RecentFileEntity(
     @ColumnInfo(name = "account_id")
     val accountId: Long,
-
     @ColumnInfo(name = "file_id")
     val fileId: String,
-
     @ColumnInfo(name = "last_accessed_at")
     val lastAccessedAt: Long,
 )
@@ -212,10 +193,8 @@ data class RecentFileEntity(
 data class FavoriteFileEntity(
     @ColumnInfo(name = "account_id")
     val accountId: Long,
-
     @ColumnInfo(name = "file_id")
     val fileId: String,
-
     @ColumnInfo(name = "starred_at")
     val starredAt: Long,
 )

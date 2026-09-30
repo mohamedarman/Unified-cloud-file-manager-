@@ -23,7 +23,6 @@ import kotlinx.coroutines.flow.Flow
  */
 @Dao
 interface AccountDao {
-
     // -----------------------------------------------------------------------
     // ConnectedAccount
     // -----------------------------------------------------------------------
@@ -60,7 +59,10 @@ interface AccountDao {
     suspend fun upsert(account: ConnectedAccountEntity)
 
     @Query("UPDATE connected_account SET is_active = :isActive WHERE local_id = :accountId")
-    suspend fun setActive(accountId: Long, isActive: Boolean)
+    suspend fun setActive(
+        accountId: Long,
+        isActive: Boolean,
+    )
 
     /**
      * Removes the account row.
@@ -110,7 +112,10 @@ interface AccountDao {
      * cannot leave an account with no usable credential.
      */
     @Query("DELETE FROM token_set WHERE account_id = :accountId AND id != :keepId")
-    suspend fun deleteSupersededTokens(accountId: Long, keepId: Long)
+    suspend fun deleteSupersededTokens(
+        accountId: Long,
+        keepId: Long,
+    )
 
     @Query("DELETE FROM token_set WHERE account_id = :accountId")
     suspend fun deleteAllTokens(accountId: Long)

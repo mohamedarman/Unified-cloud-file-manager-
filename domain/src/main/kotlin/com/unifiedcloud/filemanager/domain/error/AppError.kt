@@ -18,8 +18,10 @@ import com.unifiedcloud.filemanager.domain.model.ProviderId
  * "this app's scope is too narrow", which are different problems with different
  * fixes (PC-3, PC-4).
  */
-sealed interface AppError {
-
+sealed class AppError(
+    message: String? = null,
+    cause: Throwable? = null,
+) : Exception(message, cause) {
     /**
      * The credential is absent, expired, revoked, or lacks a required scope.
      *
@@ -30,7 +32,7 @@ sealed interface AppError {
      */
     data class Unauthorized(
         val reason: PermissionReason,
-    ) : AppError
+    ) : AppError("Unauthorized: $reason")
 
     /**
      * A refresh attempt failed.
@@ -45,15 +47,16 @@ sealed interface AppError {
         val httpStatus: Int?,
         val retryable: Boolean,
         val recovery: Recovery,
-    ) : AppError
+    ) : AppError("Token refresh failed: $errorCode (status=$httpStatus)")
 
     /**
      * Transport-level failure. No HTTP response was obtained.
      */
     data class Network(
+        @get:JvmName("getTransportCause")
         val cause: TransportCause,
         val retryable: Boolean,
-    ) : AppError
+    ) : AppError("Network error: $cause")
 
     /**
      * The provider applied client-side throttling.
@@ -63,7 +66,7 @@ sealed interface AppError {
      */
     data class RateLimited(
         val retryAfterMillis: Long,
-    ) : AppError
+    ) : AppError("Rate limited. Retry after $retryAfterMillis ms")
 
     /**
      * The account's own provider quota is exhausted.
@@ -78,7 +81,7 @@ sealed interface AppError {
         val scope: QuotaScope,
         val limitBytes: Long?,
         val usedBytes: Long?,
-    ) : AppError
+    ) : AppError("Quota exceeded: $scope")
 
     /**
      * The file is gone, or was never visible to this account.
@@ -89,7 +92,7 @@ sealed interface AppError {
      */
     data class FileNotFound(
         val ref: FileRef,
-    ) : AppError
+    ) : AppError("File not found: $ref")
 
     /**
      * The provider is temporarily unusable - outage, or the app is being
@@ -97,13 +100,13 @@ sealed interface AppError {
      */
     data class ProviderUnavailable(
         val providerId: ProviderId,
-    ) : AppError
+    ) : AppError("Provider unavailable: $providerId")
 
     /**
      * Cancelled by the user or by a superseding operation. Not an error state to
      * display; the UI returns to its prior state.
      */
-    data object Cancelled : AppError
+    data object Cancelled : AppError("Operation cancelled")
 
     /**
      * A failure we could not classify.
@@ -113,9 +116,9 @@ sealed interface AppError {
      * at the point of display (LG-3).
      */
     data class Unknown(
-        val message: String?,
-        val cause: Throwable?,
-    ) : AppError
+        override val message: String?,
+        override val cause: Throwable?,
+    ) : AppError(message, cause)
 }
 
 /** Why a credential is not usable. Drives the correct remediation (PC-3, PC-4). */

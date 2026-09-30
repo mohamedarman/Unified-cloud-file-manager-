@@ -50,7 +50,6 @@ sealed interface RetryDecision {
  *     retries forever is indistinguishable from a hung app.
  */
 object TransferRetryPolicy {
-
     const val DEFAULT_MAX_ATTEMPTS = 5
     const val BASE_DELAY_MILLIS = 500L
     const val MAX_DELAY_MILLIS = 60_000L
@@ -77,9 +76,10 @@ object TransferRetryPolicy {
             is AppError.FileNotFound -> RetryDecision.Surface(error)
 
             // 3. Obey the provider's own instruction.
-            is AppError.RateLimited -> RetryDecision.Retry(
-                error.retryAfterMillis.coerceIn(0, MAX_DELAY_MILLIS),
-            )
+            is AppError.RateLimited ->
+                RetryDecision.Retry(
+                    error.retryAfterMillis.coerceIn(0, MAX_DELAY_MILLIS),
+                )
 
             // Quota is the account's own limit; retrying cannot change it, and
             // hammering a quota-exhausted account is actively unhelpful.
@@ -117,7 +117,10 @@ object TransferRetryPolicy {
      * moment (a tunnel, a dead router). Without jitter they all retry in lockstep
      * and recreate the overload that caused the failure.
      */
-    internal fun backoffMillis(attempt: Int, random: Random): Long {
+    internal fun backoffMillis(
+        attempt: Int,
+        random: Random,
+    ): Long {
         val exponential = BASE_DELAY_MILLIS * (1L shl min(attempt - 1, 20))
         val capped = min(exponential, MAX_DELAY_MILLIS)
         return if (capped <= 0) 0 else random.nextLong(0, capped + 1)

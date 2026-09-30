@@ -21,11 +21,12 @@ inline fun <T, R> Result<T>.mapCatching(transform: (T) -> R): Result<R> =
 inline fun <T, R> Result<T>.flatMapCatching(transform: (T) -> Result<R>): Result<R> =
     fold(onSuccess = transform, onFailure = { Result.failure(it) })
 
-inline fun <T> Result<T>.onAppError(action: (AppError) -> Unit): Result<T> = apply {
-    exceptionOrNull()?.let { throwable ->
-        if (throwable is AppError) action(throwable)
+inline fun <T> Result<T>.onAppError(action: (AppError) -> Unit): Result<T> =
+    apply {
+        exceptionOrNull()?.let { throwable ->
+            if (throwable is AppError) action(throwable)
+        }
     }
-}
 
 /**
  * Runs [block], converting a thrown [AppError] into a failed [Result].

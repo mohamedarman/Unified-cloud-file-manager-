@@ -104,7 +104,7 @@ data class FileRef(
      */
     fun cacheKey(): String = "${provider.value}:${accountId.value}:${fileId.value}"
 
-    override fun toString(): String = "FileRef(${provider.value}, acct#${accountId.value}, ${fileId})"
+    override fun toString(): String = "FileRef(${provider.value}, acct#${accountId.value}, $fileId)"
 }
 
 /**
@@ -112,5 +112,7 @@ data class FileRef(
  * account. Prevents mixing a file id from one provider with an account from
  * another.
  */
-fun accountFileRef(account: AccountRef, fileId: ProviderFileId): FileRef =
-    FileRef(provider = account.provider, accountId = account.localId, fileId = fileId)
+fun accountFileRef(
+    account: AccountRef,
+    fileId: ProviderFileId,
+): FileRef = FileRef(provider = account.provider, accountId = account.localId, fileId = fileId)

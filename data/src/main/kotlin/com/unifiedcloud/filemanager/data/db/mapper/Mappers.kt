@@ -59,19 +59,19 @@ enum class FileSyncState {
          * wasteful but correct, rather than trusting a state whose meaning is
          * unknown.
          */
-        fun fromStorage(raw: String?): FileSyncState =
-            entries.firstOrNull { it.name == raw } ?: PENDING
+        fun fromStorage(raw: String?): FileSyncState = entries.firstOrNull { it.name == raw } ?: PENDING
     }
 }
 
 /** The UI-facing freshness implied by a row's sync state. */
-fun FileSyncState.toFreshness(): Freshness = when (this) {
-    FileSyncState.SYNCED -> Freshness.FRESH
-    FileSyncState.SYNCING -> Freshness.STALE
-    FileSyncState.FAILED -> Freshness.STALE
-    FileSyncState.PENDING -> Freshness.NONE
-    FileSyncState.DELETED -> Freshness.NONE
-}
+fun FileSyncState.toFreshness(): Freshness =
+    when (this) {
+        FileSyncState.SYNCED -> Freshness.FRESH
+        FileSyncState.SYNCING -> Freshness.STALE
+        FileSyncState.FAILED -> Freshness.STALE
+        FileSyncState.PENDING -> Freshness.NONE
+        FileSyncState.DELETED -> Freshness.NONE
+    }
 
 // -----------------------------------------------------------------------------
 // ConnectedAccount
@@ -83,14 +83,15 @@ fun FileSyncState.toFreshness(): Freshness = when (this) {
  *   unknown provider is handled once, at the call site that can decide what it
  *   means, rather than in a mapper.
  */
-fun ConnectedAccountEntity.toDomain(providerId: ProviderId): Result<AccountRef> = runCatching {
-    AccountRef(
-        localId = LocalAccountId(localId),
-        provider = providerId,
-        providerAccountId = providerAccountId,
-        displayEmail = displayEmail,
-    )
-}
+fun ConnectedAccountEntity.toDomain(providerId: ProviderId): Result<AccountRef> =
+    runCatching {
+        AccountRef(
+            localId = LocalAccountId(localId),
+            provider = providerId,
+            providerAccountId = providerAccountId,
+            displayEmail = displayEmail,
+        )
+    }
 
 // -----------------------------------------------------------------------------
 // FileMetadata
@@ -104,24 +105,26 @@ fun ConnectedAccountEntity.toDomain(providerId: ProviderId): Result<AccountRef> 
  * denormalised for no query benefit. That also means a file row is meaningless
  * without its account, which the `account_id` foreign key already guarantees.
  */
-fun FileMetadataEntity.toDomain(providerId: ProviderId): CloudFile = CloudFile(
-    ref = FileRef(
-        provider = providerId,
-        accountId = LocalAccountId(accountId),
-        fileId = ProviderFileId(fileId),
-    ),
-    name = name,
-    mimeType = mimeType,
-    sizeBytes = sizeBytes,
-    modifiedTimeMillis = modifiedAt,
-    isFolder = isFolder,
-    parentFolderId = parentFileId?.let(::ProviderFileId),
-    isShared = isShared,
-    isOwnedByUser = isOwnedByUser,
-    isStarred = isStarred,
-    isOfflineAvailable = isOfflineAvailable,
-    isTrashed = trashed,
-)
+fun FileMetadataEntity.toDomain(providerId: ProviderId): CloudFile =
+    CloudFile(
+        ref =
+            FileRef(
+                provider = providerId,
+                accountId = LocalAccountId(accountId),
+                fileId = ProviderFileId(fileId),
+            ),
+        name = name,
+        mimeType = mimeType,
+        sizeBytes = sizeBytes,
+        modifiedTimeMillis = modifiedAt,
+        isFolder = isFolder,
+        parentFolderId = parentFileId?.let(::ProviderFileId),
+        isShared = isShared,
+        isOwnedByUser = isOwnedByUser,
+        isStarred = isStarred,
+        isOfflineAvailable = isOfflineAvailable,
+        isTrashed = trashed,
+    )
 
 /**
  * The entity form of a domain file.
@@ -133,23 +136,24 @@ fun FileMetadataEntity.toDomain(providerId: ProviderId): CloudFile = CloudFile(
 fun CloudFile.toEntity(
     accountId: LocalAccountId,
     syncState: FileSyncState,
-): FileMetadataEntity = FileMetadataEntity(
-    // localId is deliberately 0: this is an insert-or-update by natural key.
-    // Carrying the old surrogate across would be wrong, since upsert resolves on
-    // (accountId, fileId).
-    localId = 0,
-    accountId = accountId.value,
-    fileId = ref.fileId.value,
-    name = name,
-    mimeType = mimeType,
-    sizeBytes = sizeBytes,
-    modifiedAt = modifiedTimeMillis,
-    isFolder = isFolder,
-    parentFileId = parentFolderId?.value,
-    isShared = isShared,
-    isOwnedByUser = isOwnedByUser,
-    isStarred = isStarred,
-    trashed = isTrashed,
-    isOfflineAvailable = isOfflineAvailable,
-    syncState = syncState.name,
-)
+): FileMetadataEntity =
+    FileMetadataEntity(
+        // localId is deliberately 0: this is an insert-or-update by natural key.
+        // Carrying the old surrogate across would be wrong, since upsert resolves on
+        // (accountId, fileId).
+        localId = 0,
+        accountId = accountId.value,
+        fileId = ref.fileId.value,
+        name = name,
+        mimeType = mimeType,
+        sizeBytes = sizeBytes,
+        modifiedAt = modifiedTimeMillis,
+        isFolder = isFolder,
+        parentFileId = parentFolderId?.value,
+        isShared = isShared,
+        isOwnedByUser = isOwnedByUser,
+        isStarred = isStarred,
+        trashed = isTrashed,
+        isOfflineAvailable = isOfflineAvailable,
+        syncState = syncState.name,
+    )

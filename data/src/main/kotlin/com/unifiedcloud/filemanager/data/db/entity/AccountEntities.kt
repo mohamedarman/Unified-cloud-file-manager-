@@ -51,20 +51,15 @@ data class ConnectedAccountEntity(
     @PrimaryKey(autoGenerate = true)
     @ColumnInfo(name = "local_id")
     val localId: Long = 0,
-
     @ColumnInfo(name = "provider")
     val provider: String,
-
     @ColumnInfo(name = "provider_account_id")
     val providerAccountId: String,
-
     /** Null rather than an empty string: "no address on file" is a real state. */
     @ColumnInfo(name = "display_email")
     val displayEmail: String?,
-
     @ColumnInfo(name = "is_active")
     val isActive: Boolean,
-
     @ColumnInfo(name = "connected_at")
     val connectedAt: Long,
 )
@@ -94,16 +89,12 @@ data class AccountStateEntity(
     @PrimaryKey
     @ColumnInfo(name = "account_id")
     val accountId: Long,
-
     @ColumnInfo(name = "last_capabilities_at")
     val lastCapabilitiesAt: Long?,
-
     @ColumnInfo(name = "granted_scope")
     val grantedScope: String?,
-
     @ColumnInfo(name = "quota_used_bytes")
     val quotaUsedBytes: Long?,
-
     @ColumnInfo(name = "quota_limit_bytes")
     val quotaLimitBytes: Long?,
 )
@@ -140,21 +131,16 @@ data class TokenSetEntity(
     @PrimaryKey(autoGenerate = true)
     @ColumnInfo(name = "id")
     val id: Long = 0,
-
     @ColumnInfo(name = "account_id")
     val accountId: Long,
-
     /** Opaque encrypted blob. Never logged, never in a crash report, never in an error message. */
     @ColumnInfo(name = "ciphertext")
     val ciphertext: ByteArray,
-
     @ColumnInfo(name = "iv")
     val iv: ByteArray,
-
     /** Expiry of the wrapped credential, in epoch millis. Nullable: no known expiry is a real state. */
     @ColumnInfo(name = "expires_at")
     val expiresAt: Long?,
-
     @ColumnInfo(name = "created_at")
     val createdAt: Long,
 ) {

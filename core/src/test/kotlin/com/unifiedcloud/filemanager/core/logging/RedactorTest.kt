@@ -12,7 +12,6 @@ import org.junit.Test
  * file name is the user's data. These assertions are the enforcement.
  */
 class RedactorTest {
-
     // --- file identity ------------------------------------------------------
 
     @Test

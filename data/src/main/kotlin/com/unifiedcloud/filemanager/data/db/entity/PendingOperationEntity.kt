@@ -50,10 +50,8 @@ data class PendingOperationEntity(
     @PrimaryKey(autoGenerate = true)
     @ColumnInfo(name = "id")
     val id: Long = 0,
-
     @ColumnInfo(name = "account_id")
     val accountId: Long,
-
     /**
      * Operation discriminator: `RENAME`, `MOVE`, `COPY`, `TRASH`, `RESTORE`,
      * `CREATE_FOLDER`, `UPLOAD`, `DELETE_PERMANENTLY`.
@@ -65,27 +63,20 @@ data class PendingOperationEntity(
      */
     @ColumnInfo(name = "operation")
     val operation: String,
-
     /** The file this concerns. Nullable only for `CREATE_FOLDER`, which has no parent file yet. */
     @ColumnInfo(name = "file_id")
     val fileId: String?,
-
     /** Intended parameters, opaque to the database. Never contains a token. */
     @ColumnInfo(name = "payload")
     val payload: String?,
-
     @ColumnInfo(name = "state")
     val state: String,
-
     @ColumnInfo(name = "created_at")
     val createdAt: Long,
-
     @ColumnInfo(name = "last_attempt_at")
     val lastAttemptAt: Long?,
-
     @ColumnInfo(name = "attempt_count")
     val attemptCount: Int = 0,
-
     /**
      * True when the request may have reached the provider but the outcome is
      * unknown.

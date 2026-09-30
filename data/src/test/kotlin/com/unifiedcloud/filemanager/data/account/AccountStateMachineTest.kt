@@ -17,17 +17,23 @@ import org.junit.Test
  *    operation dropping it into `ReauthRequired` and looking like a revocation.
  */
 class AccountStateMachineTest {
-
     private val connected = AccountEvent.TokensStored(verifiedByLiveCall = true)
     private val unverified = AccountEvent.TokensStored(verifiedByLiveCall = false)
 
-    private fun allowed(from: AccountState, event: AccountEvent): AccountState {
+    private fun allowed(
+        from: AccountState,
+        event: AccountEvent,
+    ): AccountState {
         val result = AccountStateMachine.next(from, event)
         assertTrue("expected $from + $event to be allowed, got $result", result is Transition.Allowed)
         return (result as Transition.Allowed).to
     }
 
-    private fun refused(from: AccountState, event: AccountEvent, why: TransitionRefusal) {
+    private fun refused(
+        from: AccountState,
+        event: AccountEvent,
+        why: TransitionRefusal,
+    ) {
         val result = AccountStateMachine.next(from, event)
         assertEquals(
             "expected $from + $event to be refused because $why, got $result",
@@ -177,14 +183,16 @@ class AccountStateMachineTest {
     @Test
     fun `abandoning consent and cancelling an operation are different events`() {
         // The distinction the explicit OperationCancelled event exists to keep.
-        val abandoned = AccountStateMachine.next(
-            AccountState.AUTHORIZING,
-            AccountEvent.ConsentAbandoned,
-        )
-        val cancelled = AccountStateMachine.next(
-            AccountState.AUTHORIZING,
-            AccountEvent.OperationCancelled,
-        )
+        val abandoned =
+            AccountStateMachine.next(
+                AccountState.AUTHORIZING,
+                AccountEvent.ConsentAbandoned,
+            )
+        val cancelled =
+            AccountStateMachine.next(
+                AccountState.AUTHORIZING,
+                AccountEvent.OperationCancelled,
+            )
 
         assertTrue(abandoned is Transition.Allowed)
         assertTrue(cancelled is Transition.Refused)
@@ -194,13 +202,14 @@ class AccountStateMachineTest {
 
     @Test
     fun `ReauthRequired refuses to start an operation`() {
-        val operationalEvents = listOf(
-            AccountEvent.AccessTokenExpired,
-            AccountEvent.RefreshSucceeded,
-            AccountEvent.RefreshRejected,
-            AccountEvent.ProviderRejectedCredential,
-            AccountEvent.AddAccountRequested,
-        )
+        val operationalEvents =
+            listOf(
+                AccountEvent.AccessTokenExpired,
+                AccountEvent.RefreshSucceeded,
+                AccountEvent.RefreshRejected,
+                AccountEvent.ProviderRejectedCredential,
+                AccountEvent.AddAccountRequested,
+            )
 
         operationalEvents.forEach { event ->
             refused(
@@ -216,12 +225,13 @@ class AccountStateMachineTest {
         // TK-7, SM-1, RT-7. Offering every refresh-flavoured event in turn must
         // not walk the account back out of the terminal state.
         var state = AccountState.REAUTH_REQUIRED
-        val refreshEvents = listOf(
-            AccountEvent.AccessTokenExpired,
-            AccountEvent.RefreshSucceeded,
-            AccountEvent.RefreshRejected,
-            AccountEvent.ProviderRejectedCredential,
-        )
+        val refreshEvents =
+            listOf(
+                AccountEvent.AccessTokenExpired,
+                AccountEvent.RefreshSucceeded,
+                AccountEvent.RefreshRejected,
+                AccountEvent.ProviderRejectedCredential,
+            )
 
         repeat(10) {
             refreshEvents.forEach { event ->
@@ -235,10 +245,11 @@ class AccountStateMachineTest {
 
     @Test
     fun `the only escapes from ReauthRequired are user actions`() {
-        val escapes = listOf(
-            AccountEvent.ReconnectRequested,
-            AccountEvent.DisconnectRequested,
-        )
+        val escapes =
+            listOf(
+                AccountEvent.ReconnectRequested,
+                AccountEvent.DisconnectRequested,
+            )
 
         escapes.forEach { event ->
             assertTrue(
@@ -252,17 +263,18 @@ class AccountStateMachineTest {
 
     @Test
     fun `every event with no edge from a state is refused`() {
-        val all = listOf(
-            AccountEvent.AddAccountRequested,
-            AccountEvent.ConsentAbandoned,
-            connected,
-            AccountEvent.AccessTokenExpired,
-            AccountEvent.RefreshSucceeded,
-            AccountEvent.RefreshRejected,
-            AccountEvent.ProviderRejectedCredential,
-            AccountEvent.ReconnectRequested,
-            AccountEvent.DisconnectRequested,
-        )
+        val all =
+            listOf(
+                AccountEvent.AddAccountRequested,
+                AccountEvent.ConsentAbandoned,
+                connected,
+                AccountEvent.AccessTokenExpired,
+                AccountEvent.RefreshSucceeded,
+                AccountEvent.RefreshRejected,
+                AccountEvent.ProviderRejectedCredential,
+                AccountEvent.ReconnectRequested,
+                AccountEvent.DisconnectRequested,
+            )
 
         AccountState.values().forEach { state ->
             all.filter { event ->

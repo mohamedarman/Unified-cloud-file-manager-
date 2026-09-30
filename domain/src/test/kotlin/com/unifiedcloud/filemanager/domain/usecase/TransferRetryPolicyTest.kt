@@ -15,15 +15,14 @@ import org.junit.Test
 import kotlin.random.Random
 
 class TransferRetryPolicyTest {
+    private fun ref() =
+        FileRef(
+            provider = ProviderId.GOOGLE_DRIVE,
+            accountId = LocalAccountId(1),
+            fileId = ProviderFileId("f1"),
+        )
 
-    private fun ref() = FileRef(
-        provider = ProviderId.GOOGLE_DRIVE,
-        accountId = LocalAccountId(1),
-        fileId = ProviderFileId("f1"),
-    )
-
-    private fun network(retryable: Boolean = true) =
-        AppError.Network(TransportCause.TIMEOUT, retryable)
+    private fun network(retryable: Boolean = true) = AppError.Network(TransportCause.TIMEOUT, retryable)
 
     // --- cancellation ------------------------------------------------------
 
@@ -50,10 +49,11 @@ class TransferRetryPolicyTest {
 
     @Test
     fun `unauthorized is surfaced immediately`() {
-        val decision = TransferRetryPolicy.decide(
-            AppError.Unauthorized(PermissionReason.SCOPE_INSUFFICIENT),
-            attempt = 1,
-        )
+        val decision =
+            TransferRetryPolicy.decide(
+                AppError.Unauthorized(PermissionReason.SCOPE_INSUFFICIENT),
+                attempt = 1,
+            )
 
         assertTrue(decision is RetryDecision.Surface)
     }
@@ -67,10 +67,11 @@ class TransferRetryPolicyTest {
 
     @Test
     fun `quota is surfaced rather than retried`() {
-        val decision = TransferRetryPolicy.decide(
-            AppError.QuotaExceeded(ProviderId.GOOGLE_DRIVE, QuotaScope.STORAGE, null, null),
-            attempt = 1,
-        )
+        val decision =
+            TransferRetryPolicy.decide(
+                AppError.QuotaExceeded(ProviderId.GOOGLE_DRIVE, QuotaScope.STORAGE, null, null),
+                attempt = 1,
+            )
 
         // Retrying cannot change the user's own Drive limit.
         assertTrue(decision is RetryDecision.Surface)
@@ -78,10 +79,11 @@ class TransferRetryPolicyTest {
 
     @Test
     fun `unknown is surfaced so a mapping bug stays visible`() {
-        val decision = TransferRetryPolicy.decide(
-            AppError.Unknown("something odd", null),
-            attempt = 1,
-        )
+        val decision =
+            TransferRetryPolicy.decide(
+                AppError.Unknown("something odd", null),
+                attempt = 1,
+            )
 
         assertTrue(decision is RetryDecision.Surface)
     }
@@ -90,20 +92,22 @@ class TransferRetryPolicyTest {
 
     @Test
     fun `rate limit honours the provider's own delay`() {
-        val decision = TransferRetryPolicy.decide(
-            AppError.RateLimited(retryAfterMillis = 7_000),
-            attempt = 1,
-        )
+        val decision =
+            TransferRetryPolicy.decide(
+                AppError.RateLimited(retryAfterMillis = 7_000),
+                attempt = 1,
+            )
 
         assertEquals(RetryDecision.Retry(7_000), decision)
     }
 
     @Test
     fun `rate limit delay is capped so a hostile value cannot hang a worker`() {
-        val decision = TransferRetryPolicy.decide(
-            AppError.RateLimited(retryAfterMillis = Long.MAX_VALUE),
-            attempt = 1,
-        )
+        val decision =
+            TransferRetryPolicy.decide(
+                AppError.RateLimited(retryAfterMillis = Long.MAX_VALUE),
+                attempt = 1,
+            )
 
         assertEquals(
             RetryDecision.Retry(TransferRetryPolicy.MAX_DELAY_MILLIS),
@@ -115,11 +119,12 @@ class TransferRetryPolicyTest {
     fun `rate limit uses the provider delay, not our backoff`() {
         // The provider knows when it will accept us. Substituting our own
         // exponential would guarantee the next call fails.
-        val decision = TransferRetryPolicy.decide(
-            AppError.RateLimited(retryAfterMillis = 250),
-            attempt = 4,
-            jitterSource = Random(1),
-        )
+        val decision =
+            TransferRetryPolicy.decide(
+                AppError.RateLimited(retryAfterMillis = 250),
+                attempt = 4,
+                jitterSource = Random(1),
+            )
 
         assertEquals(RetryDecision.Retry(250), decision)
     }
@@ -128,32 +133,35 @@ class TransferRetryPolicyTest {
 
     @Test
     fun `retryable network failure is retried`() {
-        val decision = TransferRetryPolicy.decide(
-            network(retryable = true),
-            attempt = 1,
-            jitterSource = Random(42),
-        )
+        val decision =
+            TransferRetryPolicy.decide(
+                network(retryable = true),
+                attempt = 1,
+                jitterSource = Random(42),
+            )
 
         assertTrue(decision is RetryDecision.Retry)
     }
 
     @Test
     fun `non-retryable network failure is surfaced`() {
-        val decision = TransferRetryPolicy.decide(
-            network(retryable = false),
-            attempt = 1,
-        )
+        val decision =
+            TransferRetryPolicy.decide(
+                network(retryable = false),
+                attempt = 1,
+            )
 
         assertTrue(decision is RetryDecision.Surface)
     }
 
     @Test
     fun `provider unavailable is retried`() {
-        val decision = TransferRetryPolicy.decide(
-            AppError.ProviderUnavailable(ProviderId.GOOGLE_DRIVE),
-            attempt = 2,
-            jitterSource = Random(7),
-        )
+        val decision =
+            TransferRetryPolicy.decide(
+                AppError.ProviderUnavailable(ProviderId.GOOGLE_DRIVE),
+                attempt = 2,
+                jitterSource = Random(7),
+            )
 
         assertTrue(decision is RetryDecision.Retry)
     }
@@ -162,33 +170,35 @@ class TransferRetryPolicyTest {
 
     @Test
     fun `transparent token refresh failure is retried`() {
-        val decision = TransferRetryPolicy.decide(
-            AppError.TokenRefreshFailed(
-                providerId = ProviderId.GOOGLE_DRIVE,
-                errorCode = "invalid_grant",
-                httpStatus = 400,
-                retryable = true,
-                recovery = Recovery.RETRY_TRANSPARENTLY,
-            ),
-            attempt = 1,
-            jitterSource = Random(3),
-        )
+        val decision =
+            TransferRetryPolicy.decide(
+                AppError.TokenRefreshFailed(
+                    providerId = ProviderId.GOOGLE_DRIVE,
+                    errorCode = "invalid_grant",
+                    httpStatus = 400,
+                    retryable = true,
+                    recovery = Recovery.RETRY_TRANSPARENTLY,
+                ),
+                attempt = 1,
+                jitterSource = Random(3),
+            )
 
         assertTrue(decision is RetryDecision.Retry)
     }
 
     @Test
     fun `reauthorise-required token failure is surfaced not retried`() {
-        val decision = TransferRetryPolicy.decide(
-            AppError.TokenRefreshFailed(
-                providerId = ProviderId.GOOGLE_DRIVE,
-                errorCode = "invalid_scope",
-                httpStatus = 403,
-                retryable = true,
-                recovery = Recovery.REAUTHORISE,
-            ),
-            attempt = 1,
-        )
+        val decision =
+            TransferRetryPolicy.decide(
+                AppError.TokenRefreshFailed(
+                    providerId = ProviderId.GOOGLE_DRIVE,
+                    errorCode = "invalid_scope",
+                    httpStatus = 403,
+                    retryable = true,
+                    recovery = Recovery.REAUTHORISE,
+                ),
+                attempt = 1,
+            )
 
         // Retrying a credential that must be re-authorised wastes the user's time
         // and can trip Google's rate limiting on the token endpoint.
@@ -199,32 +209,35 @@ class TransferRetryPolicyTest {
 
     @Test
     fun `retries stop at the attempt cap`() {
-        val decision = TransferRetryPolicy.decide(
-            network(),
-            attempt = TransferRetryPolicy.DEFAULT_MAX_ATTEMPTS,
-            jitterSource = Random(1),
-        )
+        val decision =
+            TransferRetryPolicy.decide(
+                network(),
+                attempt = TransferRetryPolicy.DEFAULT_MAX_ATTEMPTS,
+                jitterSource = Random(1),
+            )
 
         assertTrue(decision is RetryDecision.Surface)
     }
 
     @Test
     fun `a retryable failure below the cap still retries`() {
-        val decision = TransferRetryPolicy.decide(
-            network(),
-            attempt = TransferRetryPolicy.DEFAULT_MAX_ATTEMPTS - 1,
-            jitterSource = Random(1),
-        )
+        val decision =
+            TransferRetryPolicy.decide(
+                network(),
+                attempt = TransferRetryPolicy.DEFAULT_MAX_ATTEMPTS - 1,
+                jitterSource = Random(1),
+            )
 
         assertTrue(decision is RetryDecision.Retry)
     }
 
     @Test
     fun `the cap holds even for a rate limit`() {
-        val decision = TransferRetryPolicy.decide(
-            AppError.RateLimited(1_000),
-            attempt = 99,
-        )
+        val decision =
+            TransferRetryPolicy.decide(
+                AppError.RateLimited(1_000),
+                attempt = 99,
+            )
 
         assertTrue(decision is RetryDecision.Surface)
     }

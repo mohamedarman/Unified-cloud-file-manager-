@@ -57,7 +57,6 @@ class ContentSource(
     val lengthBytes: Long?,
     private val stream: InputStream,
 ) : AutoCloseable {
-
     /**
      * True when the provider will refuse a range request, in which case the
      * engine must not attempt resume for this source.
@@ -91,7 +90,10 @@ data class ByteRange(val start: Long, val endInclusive: Long) {
  * naturally (X-3).
  */
 fun interface ProgressSink {
-    suspend fun onProgress(bytesTransferred: Long, totalBytes: Long?)
+    suspend fun onProgress(
+        bytesTransferred: Long,
+        totalBytes: Long?,
+    )
 }
 
 /**
@@ -118,14 +120,18 @@ data class TransferState(
 
     sealed interface Status {
         data object Queued : Status
+
         data object Running : Status
+
         data object Paused : Status
 
         /** Retrying after a failure judged transient at the boundary (M-6). */
         data class Retrying(val attempt: Int, val nextRetryMillis: Long) : Status
 
         data class Completed(val ref: FileRef) : Status
+
         data class Failed(val error: AppError) : Status
+
         data object Cancelled : Status
     }
 }

@@ -35,9 +35,10 @@ import com.unifiedcloud.filemanager.data.db.entity.TokenSetEntity
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {
-
     abstract fun accountDao(): AccountDao
+
     abstract fun fileDao(): FileDao
+
     abstract fun pendingOperationDao(): PendingOperationDao
 
     companion object {

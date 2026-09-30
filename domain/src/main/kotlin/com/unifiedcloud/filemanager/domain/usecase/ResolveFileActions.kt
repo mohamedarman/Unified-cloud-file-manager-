@@ -56,8 +56,11 @@ data class ActionAvailability(
 
     companion object {
         fun yes(action: FileAction) = ActionAvailability(action, available = true)
-        fun no(action: FileAction, reason: UnavailableReason) =
-            ActionAvailability(action, available = false, reason = reason)
+
+        fun no(
+            action: FileAction,
+            reason: UnavailableReason,
+        ) = ActionAvailability(action, available = false, reason = reason)
     }
 }
 
@@ -86,8 +89,10 @@ data class ActionAvailability(
  * disappears as soon as capabilities load.
  */
 object ResolveFileActions {
-
-    fun resolve(file: CloudFile, capabilities: ProviderCapabilities): Set<ActionAvailability> =
+    fun resolve(
+        file: CloudFile,
+        capabilities: ProviderCapabilities,
+    ): Set<ActionAvailability> =
         buildSet {
             add(open(file, capabilities))
             add(download(file, capabilities))
@@ -109,7 +114,10 @@ object ResolveFileActions {
      * redirect, which is correct behaviour rather than a special case - and it
      * is why [FileAction.EXPORT] exists separately for those files.
      */
-    private fun open(file: CloudFile, c: ProviderCapabilities): ActionAvailability =
+    private fun open(
+        file: CloudFile,
+        c: ProviderCapabilities,
+    ): ActionAvailability =
         if (c.canReadFiles != true) {
             ActionAvailability.no(
                 FileAction.OPEN,
@@ -119,45 +127,64 @@ object ResolveFileActions {
             ActionAvailability.yes(FileAction.OPEN)
         }
 
-    private fun download(file: CloudFile, c: ProviderCapabilities): ActionAvailability = when {
-        file.isFolder -> ActionAvailability.no(
-            FileAction.DOWNLOAD,
-            UnavailableReason.FileCannot("A folder has no content to download"),
-        )
-        file.isGoogleNative -> ActionAvailability.no(
-            FileAction.DOWNLOAD,
-            UnavailableReason.FileCannot("This document has no downloadable form; export it instead"),
-        )
-        c.canDownloadBytes != true -> ActionAvailability.no(
-            FileAction.DOWNLOAD,
-            UnavailableReason.ScopeInsufficient(Feature.DOWNLOAD),
-        )
-        else -> ActionAvailability.yes(FileAction.DOWNLOAD)
-    }
+    private fun download(
+        file: CloudFile,
+        c: ProviderCapabilities,
+    ): ActionAvailability =
+        when {
+            file.isFolder ->
+                ActionAvailability.no(
+                    FileAction.DOWNLOAD,
+                    UnavailableReason.FileCannot("A folder has no content to download"),
+                )
+            file.isGoogleNative ->
+                ActionAvailability.no(
+                    FileAction.DOWNLOAD,
+                    UnavailableReason.FileCannot("This document has no downloadable form; export it instead"),
+                )
+            c.canDownloadBytes != true ->
+                ActionAvailability.no(
+                    FileAction.DOWNLOAD,
+                    UnavailableReason.ScopeInsufficient(Feature.DOWNLOAD),
+                )
+            else -> ActionAvailability.yes(FileAction.DOWNLOAD)
+        }
 
-    private fun export(file: CloudFile, c: ProviderCapabilities): ActionAvailability = when {
-        !file.isGoogleNative -> ActionAvailability.no(
-            FileAction.EXPORT,
-            UnavailableReason.FileCannot("Only Google documents can be exported"),
-        )
-        c.canExport != true -> ActionAvailability.no(
-            FileAction.EXPORT,
-            UnavailableReason.ScopeInsufficient(Feature.EXPORT),
-        )
-        else -> ActionAvailability.yes(FileAction.EXPORT)
-    }
+    private fun export(
+        file: CloudFile,
+        c: ProviderCapabilities,
+    ): ActionAvailability =
+        when {
+            !file.isGoogleNative ->
+                ActionAvailability.no(
+                    FileAction.EXPORT,
+                    UnavailableReason.FileCannot("Only Google documents can be exported"),
+                )
+            c.canExport != true ->
+                ActionAvailability.no(
+                    FileAction.EXPORT,
+                    UnavailableReason.ScopeInsufficient(Feature.EXPORT),
+                )
+            else -> ActionAvailability.yes(FileAction.EXPORT)
+        }
 
-    private fun rename(file: CloudFile, c: ProviderCapabilities): ActionAvailability = when {
-        !file.isOwnedByUser -> ActionAvailability.no(
-            FileAction.RENAME,
-            UnavailableReason.FileCannot("Only the owner can rename this file"),
-        )
-        c.canRename != true -> ActionAvailability.no(
-            FileAction.RENAME,
-            UnavailableReason.ScopeInsufficient(Feature.WRITE),
-        )
-        else -> ActionAvailability.yes(FileAction.RENAME)
-    }
+    private fun rename(
+        file: CloudFile,
+        c: ProviderCapabilities,
+    ): ActionAvailability =
+        when {
+            !file.isOwnedByUser ->
+                ActionAvailability.no(
+                    FileAction.RENAME,
+                    UnavailableReason.FileCannot("Only the owner can rename this file"),
+                )
+            c.canRename != true ->
+                ActionAvailability.no(
+                    FileAction.RENAME,
+                    UnavailableReason.ScopeInsufficient(Feature.WRITE),
+                )
+            else -> ActionAvailability.yes(FileAction.RENAME)
+        }
 
     /**
      * Move and copy share every condition: both need write scope, and both are
@@ -165,13 +192,20 @@ object ResolveFileActions {
      * multi-select bar offering move without copy would be a capability the UI
      * cannot express - and sharing one predicate keeps the two from drifting.
      */
-    private fun move(file: CloudFile, c: ProviderCapabilities): ActionAvailability =
-        resolveAction(FileAction.MOVE, moveOrCopyReason(file, c))
+    private fun move(
+        file: CloudFile,
+        c: ProviderCapabilities,
+    ): ActionAvailability = resolveAction(FileAction.MOVE, moveOrCopyReason(file, c))
 
-    private fun copy(file: CloudFile, c: ProviderCapabilities): ActionAvailability =
-        resolveAction(FileAction.COPY, moveOrCopyReason(file, c))
+    private fun copy(
+        file: CloudFile,
+        c: ProviderCapabilities,
+    ): ActionAvailability = resolveAction(FileAction.COPY, moveOrCopyReason(file, c))
 
-    private fun resolveAction(action: FileAction, reason: UnavailableReason?): ActionAvailability =
+    private fun resolveAction(
+        action: FileAction,
+        reason: UnavailableReason?,
+    ): ActionAvailability =
         if (reason == null) {
             ActionAvailability.yes(action)
         } else {
@@ -179,42 +213,59 @@ object ResolveFileActions {
         }
 
     /** Ownership is checked before scope, so the more useful reason is reported. */
-    private fun moveOrCopyReason(file: CloudFile, c: ProviderCapabilities): UnavailableReason? = when {
-        !file.isOwnedByUser ->
-            UnavailableReason.FileCannot("Only the owner can move or copy this file")
-        c.canWriteFiles != true ->
-            UnavailableReason.ScopeInsufficient(Feature.WRITE)
-        else -> null
-    }
+    private fun moveOrCopyReason(
+        file: CloudFile,
+        c: ProviderCapabilities,
+    ): UnavailableReason? =
+        when {
+            !file.isOwnedByUser ->
+                UnavailableReason.FileCannot("Only the owner can move or copy this file")
+            c.canWriteFiles != true ->
+                UnavailableReason.ScopeInsufficient(Feature.WRITE)
+            else -> null
+        }
 
-    private fun trash(file: CloudFile, c: ProviderCapabilities): ActionAvailability = when {
-        // Already in the trash: restore is the action, not a second trash.
-        file.isTrashed -> ActionAvailability.no(
-            FileAction.TRASH,
-            UnavailableReason.FileCannot("This file is already in the trash"),
-        )
-        !file.isOwnedByUser -> ActionAvailability.no(
-            FileAction.TRASH,
-            UnavailableReason.FileCannot("Only the owner can move this file to trash"),
-        )
-        c.canTrash != true -> ActionAvailability.no(
-            FileAction.TRASH,
-            UnavailableReason.ScopeInsufficient(Feature.WRITE),
-        )
-        else -> ActionAvailability.yes(FileAction.TRASH)
-    }
+    private fun trash(
+        file: CloudFile,
+        c: ProviderCapabilities,
+    ): ActionAvailability =
+        when {
+            // Already in the trash: restore is the action, not a second trash.
+            file.isTrashed ->
+                ActionAvailability.no(
+                    FileAction.TRASH,
+                    UnavailableReason.FileCannot("This file is already in the trash"),
+                )
+            !file.isOwnedByUser ->
+                ActionAvailability.no(
+                    FileAction.TRASH,
+                    UnavailableReason.FileCannot("Only the owner can move this file to trash"),
+                )
+            c.canTrash != true ->
+                ActionAvailability.no(
+                    FileAction.TRASH,
+                    UnavailableReason.ScopeInsufficient(Feature.WRITE),
+                )
+            else -> ActionAvailability.yes(FileAction.TRASH)
+        }
 
-    private fun restore(file: CloudFile, c: ProviderCapabilities): ActionAvailability = when {
-        !file.isTrashed -> ActionAvailability.no(
-            FileAction.RESTORE,
-            UnavailableReason.FileCannot("This file is not in the trash"),
-        )
-        c.canTrash != true -> ActionAvailability.no(
-            FileAction.RESTORE,
-            UnavailableReason.ScopeInsufficient(Feature.WRITE),
-        )
-        else -> ActionAvailability.yes(FileAction.RESTORE)
-    }
+    private fun restore(
+        file: CloudFile,
+        c: ProviderCapabilities,
+    ): ActionAvailability =
+        when {
+            !file.isTrashed ->
+                ActionAvailability.no(
+                    FileAction.RESTORE,
+                    UnavailableReason.FileCannot("This file is not in the trash"),
+                )
+            c.canTrash != true ->
+                ActionAvailability.no(
+                    FileAction.RESTORE,
+                    UnavailableReason.ScopeInsufficient(Feature.WRITE),
+                )
+            else -> ActionAvailability.yes(FileAction.RESTORE)
+        }
 
     /**
      * Permanent deletion is irreversible, so the capability check is not the
@@ -222,48 +273,70 @@ object ResolveFileActions {
      * permitted to do it at all; the confirmation requirement belongs to the
      * screen and is deliberately not modelled as a capability.
      */
-    private fun deletePermanently(file: CloudFile, c: ProviderCapabilities): ActionAvailability = when {
-        !file.isTrashed -> ActionAvailability.no(
-            FileAction.DELETE_PERMANENTLY,
-            UnavailableReason.FileCannot("Only a file in the trash can be deleted permanently"),
-        )
-        c.canTrash != true -> ActionAvailability.no(
-            FileAction.DELETE_PERMANENTLY,
-            UnavailableReason.ScopeInsufficient(Feature.WRITE),
-        )
-        else -> ActionAvailability.yes(FileAction.DELETE_PERMANENTLY)
-    }
+    private fun deletePermanently(
+        file: CloudFile,
+        c: ProviderCapabilities,
+    ): ActionAvailability =
+        when {
+            !file.isTrashed ->
+                ActionAvailability.no(
+                    FileAction.DELETE_PERMANENTLY,
+                    UnavailableReason.FileCannot("Only a file in the trash can be deleted permanently"),
+                )
+            c.canTrash != true ->
+                ActionAvailability.no(
+                    FileAction.DELETE_PERMANENTLY,
+                    UnavailableReason.ScopeInsufficient(Feature.WRITE),
+                )
+            else -> ActionAvailability.yes(FileAction.DELETE_PERMANENTLY)
+        }
 
     /** Sharing creates a new permission, so it is owner-only and needs write. */
-    private fun share(file: CloudFile, c: ProviderCapabilities): ActionAvailability = when {
-        file.isTrashed -> ActionAvailability.no(
-            FileAction.SHARE,
-            UnavailableReason.FileInTrash,
-        )
-        !file.isOwnedByUser -> ActionAvailability.no(
-            FileAction.SHARE,
-            UnavailableReason.FileCannot("Only the owner can change who this file is shared with"),
-        )
-        c.canWriteFiles != true -> ActionAvailability.no(
-            FileAction.SHARE,
-            UnavailableReason.ScopeInsufficient(Feature.WRITE),
-        )
-        else -> ActionAvailability.yes(FileAction.SHARE)
-    }
+    private fun share(
+        file: CloudFile,
+        c: ProviderCapabilities,
+    ): ActionAvailability =
+        when {
+            file.isTrashed ->
+                ActionAvailability.no(
+                    FileAction.SHARE,
+                    UnavailableReason.FileInTrash,
+                )
+            !file.isOwnedByUser ->
+                ActionAvailability.no(
+                    FileAction.SHARE,
+                    UnavailableReason.FileCannot("Only the owner can change who this file is shared with"),
+                )
+            c.canWriteFiles != true ->
+                ActionAvailability.no(
+                    FileAction.SHARE,
+                    UnavailableReason.ScopeInsufficient(Feature.WRITE),
+                )
+            else -> ActionAvailability.yes(FileAction.SHARE)
+        }
 
-    private fun revisions(file: CloudFile, c: ProviderCapabilities): ActionAvailability = when {
-        file.isFolder -> ActionAvailability.no(
-            FileAction.VIEW_REVISIONS,
-            UnavailableReason.FileCannot("Folders do not have revisions"),
-        )
-        c.canReadRevisions != true -> ActionAvailability.no(
-            FileAction.VIEW_REVISIONS,
-            UnavailableReason.ScopeInsufficient(Feature.REVISIONS),
-        )
-        else -> ActionAvailability.yes(FileAction.VIEW_REVISIONS)
-    }
+    private fun revisions(
+        file: CloudFile,
+        c: ProviderCapabilities,
+    ): ActionAvailability =
+        when {
+            file.isFolder ->
+                ActionAvailability.no(
+                    FileAction.VIEW_REVISIONS,
+                    UnavailableReason.FileCannot("Folders do not have revisions"),
+                )
+            c.canReadRevisions != true ->
+                ActionAvailability.no(
+                    FileAction.VIEW_REVISIONS,
+                    UnavailableReason.ScopeInsufficient(Feature.REVISIONS),
+                )
+            else -> ActionAvailability.yes(FileAction.VIEW_REVISIONS)
+        }
 
-    private fun star(file: CloudFile, c: ProviderCapabilities): ActionAvailability =
+    private fun star(
+        file: CloudFile,
+        c: ProviderCapabilities,
+    ): ActionAvailability =
         if (c.canStar != true) {
             ActionAvailability.no(
                 FileAction.STAR,

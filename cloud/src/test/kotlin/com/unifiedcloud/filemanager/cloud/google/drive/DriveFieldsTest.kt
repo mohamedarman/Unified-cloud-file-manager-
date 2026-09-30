@@ -15,7 +15,6 @@ import org.junit.Test
  * tolerated until someone reads the constant and wonders what it is doing.
  */
 class DriveFieldsTest {
-
     private val listFields = DriveFields.parseFields(DriveFields.FILE_LIST)
     private val metadataFields = DriveFields.parseFields(DriveFields.FILE_METADATA)
     private val aboutFields = DriveFields.parseFields(DriveFields.ABOUT)
@@ -67,14 +66,15 @@ class DriveFieldsTest {
 
     @Test
     fun `a field outside the allowlist is refused`() {
-        val overreaching = listOf(
-            "files(id,version)",
-            "files(id,properties)",
-            "files(id,permissions)",
-            "files(id,lastModifyingUser)",
-            "files(*)",
-            "*",
-        )
+        val overreaching =
+            listOf(
+                "files(id,version)",
+                "files(id,properties)",
+                "files(id,permissions)",
+                "files(id,lastModifyingUser)",
+                "files(*)",
+                "*",
+            )
 
         overreaching.forEach { fields ->
             val refused = runCatching { DriveFields.requireFieldsAllowed(fields) }
@@ -86,8 +86,9 @@ class DriveFieldsTest {
     fun `the refusal names the offending field`() {
         // A guard that says only "invalid" sends the next person looking in the
         // wrong place.
-        val thrown = runCatching { DriveFields.requireFieldsAllowed("files(id,quotaBytesUsed)") }
-            .exceptionOrNull()
+        val thrown =
+            runCatching { DriveFields.requireFieldsAllowed("files(id,quotaBytesUsed)") }
+                .exceptionOrNull()
 
         assertTrue(thrown is IllegalArgumentException)
         assertTrue(
@@ -140,26 +141,27 @@ class DriveFieldsTest {
         // Transcribed from the representative list call. If a field is added or
         // removed, this test is the reminder that §11.1.1 should be updated in
         // the same change (Rules.md DC-1, PR-12).
-        val expected = setOf(
-            "nextPageToken",
-            "id",
-            "name",
-            "mimeType",
-            "size",
-            "modifiedTime",
-            "createdTime",
-            "thumbnailLink",
-            "webViewLink",
-            "parents",
-            "trashed",
-            "starred",
-            "ownedByMe",
-            "driveId",
-            "capabilities/canRename",
-            "capabilities/canTrash",
-            "capabilities/canDownload",
-            "capabilities/canShare",
-        )
+        val expected =
+            setOf(
+                "nextPageToken",
+                "id",
+                "name",
+                "mimeType",
+                "size",
+                "modifiedTime",
+                "createdTime",
+                "thumbnailLink",
+                "webViewLink",
+                "parents",
+                "trashed",
+                "starred",
+                "ownedByMe",
+                "driveId",
+                "capabilities/canRename",
+                "capabilities/canTrash",
+                "capabilities/canDownload",
+                "capabilities/canShare",
+            )
 
         assertEquals(expected, listFields)
     }
@@ -168,14 +170,15 @@ class DriveFieldsTest {
     fun noFieldIsRequestedTwice() {
         // Drive rejects a repeated field, and a duplicate is the usual symptom of
         // a `fields` string assembled by appending at several call sites.
-        val duplicates = DriveFields.FILE_LIST
-            .removePrefix("nextPageToken,")
-            .removeSurrounding("files(", ")")
-            .split(',')
-            .groupingBy { it }
-            .eachCount()
-            .filterValues { it > 1 }
-            .keys
+        val duplicates =
+            DriveFields.FILE_LIST
+                .removePrefix("nextPageToken,")
+                .removeSurrounding("files(", ")")
+                .split(',')
+                .groupingBy { it }
+                .eachCount()
+                .filterValues { it > 1 }
+                .keys
 
         assertEquals(emptySet<String>(), duplicates)
     }

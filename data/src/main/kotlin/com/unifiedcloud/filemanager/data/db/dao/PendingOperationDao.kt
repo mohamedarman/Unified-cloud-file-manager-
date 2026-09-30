@@ -19,7 +19,6 @@ import kotlinx.coroutines.flow.Flow
  */
 @Dao
 interface PendingOperationDao {
-
     /**
      * Outstanding work for one account, oldest first.
      *
@@ -59,9 +58,7 @@ interface PendingOperationDao {
             "WHERE account_id = :accountId AND outcome_uncertain = 1 " +
             "ORDER BY created_at ASC",
     )
-    suspend fun findUncertain(
-        accountId: Long,
-    ): List<PendingOperationEntity>
+    suspend fun findUncertain(accountId: Long): List<PendingOperationEntity>
 
     @Query("SELECT * FROM pending_operation WHERE state = :state ORDER BY created_at ASC")
     suspend fun findByState(state: String): List<PendingOperationEntity>
@@ -84,13 +81,20 @@ interface PendingOperationDao {
     suspend fun update(operation: PendingOperationEntity)
 
     @Query("UPDATE pending_operation SET state = :state WHERE id = :id")
-    suspend fun setState(id: Long, state: String)
+    suspend fun setState(
+        id: Long,
+        state: String,
+    )
 
     @Query(
         "UPDATE pending_operation SET state = :state, outcome_uncertain = 0, " +
             "last_attempt_at = :at, attempt_count = attempt_count + 1 WHERE id = :id",
     )
-    suspend fun recordAttempt(id: Long, state: String, at: Long)
+    suspend fun recordAttempt(
+        id: Long,
+        state: String,
+        at: Long,
+    )
 
     @Query("DELETE FROM pending_operation WHERE id = :id")
     suspend fun deleteById(id: Long)
@@ -106,7 +110,10 @@ interface PendingOperationDao {
         "DELETE FROM pending_operation WHERE state IN (:terminalStates) " +
             "AND last_attempt_at < :olderThan",
     )
-    suspend fun pruneTerminal(terminalStates: List<String>, olderThan: Long)
+    suspend fun pruneTerminal(
+        terminalStates: List<String>,
+        olderThan: Long,
+    )
 
     @Query("SELECT COUNT(*) FROM pending_operation WHERE account_id = :accountId AND state != :terminalState")
     suspend fun countOutstanding(

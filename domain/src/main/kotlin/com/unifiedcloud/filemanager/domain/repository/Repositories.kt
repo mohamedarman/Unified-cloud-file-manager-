@@ -33,7 +33,6 @@ import java.io.InputStream
  */
 
 interface AccountRepository {
-
     /** Emits the current set of connected accounts. Never a "current" account. */
     fun observeAccounts(): Flow<List<AccountRef>>
 
@@ -46,7 +45,10 @@ interface AccountRepository {
      * already connected returns the existing local id rather than creating a
      * duplicate, so a user's data does not fork into two half-populated accounts.
      */
-    suspend fun addAccount(providerAccountId: String, displayEmail: String?): Result<LocalAccountId>
+    suspend fun addAccount(
+        providerAccountId: String,
+        displayEmail: String?,
+    ): Result<LocalAccountId>
 
     /**
      * Removes the account and its local state.
@@ -58,7 +60,6 @@ interface AccountRepository {
 }
 
 interface FileRepository {
-
     /**
      * Cached-then-fresh listing.
      *
@@ -71,7 +72,10 @@ interface FileRepository {
 
     suspend fun getFile(ref: FileRef): Result<CloudFile>
 
-    suspend fun getRecentFiles(accountId: LocalAccountId, limit: Int = 50): Result<List<CloudFile>>
+    suspend fun getRecentFiles(
+        accountId: LocalAccountId,
+        limit: Int = 50,
+    ): Result<List<CloudFile>>
 
     suspend fun getStarredFiles(accountId: LocalAccountId): Result<Page<CloudFile>>
 
@@ -89,9 +93,16 @@ interface FileRepository {
 
     // Mutations return the affected file where one exists, so the UI can update
     // from the provider's own result instead of a guess.
-    suspend fun createFolder(accountId: LocalAccountId, parentFolderId: ProviderFileId?, name: String): Result<CloudFile>
+    suspend fun createFolder(
+        accountId: LocalAccountId,
+        parentFolderId: ProviderFileId?,
+        name: String,
+    ): Result<CloudFile>
 
-    suspend fun rename(ref: FileRef, newName: String): Result<CloudFile>
+    suspend fun rename(
+        ref: FileRef,
+        newName: String,
+    ): Result<CloudFile>
 
     suspend fun trash(ref: FileRef): Result<Unit>
 
@@ -101,7 +112,10 @@ interface FileRepository {
 
     suspend fun emptyTrash(accountId: LocalAccountId): Result<Unit>
 
-    suspend fun setStarred(ref: FileRef, starred: Boolean): Result<Unit>
+    suspend fun setStarred(
+        ref: FileRef,
+        starred: Boolean,
+    ): Result<Unit>
 
     /**
      * Capabilities for an account, cached with the credential.
@@ -128,7 +142,6 @@ sealed interface FileListState {
 }
 
 interface TransferRepository {
-
     /**
      * Every transfer in flight or recent, across all accounts, tagged by account
      * so the UI can filter without re-deriving ownership.

@@ -53,7 +53,6 @@ import kotlinx.coroutines.flow.Flow
  * `CancellationException`; it must not leave a partial state visible as success.
  */
 interface CloudProvider {
-
     // -----------------------------------------------------------------------
     // Account and capability discovery
     // -----------------------------------------------------------------------
@@ -91,7 +90,10 @@ interface CloudProvider {
 
     suspend fun listFiles(query: FileQuery): Result<Page<CloudFile>>
 
-    suspend fun getFileMetadata(accountId: LocalAccountId, fileId: ProviderFileId): Result<CloudFile>
+    suspend fun getFileMetadata(
+        accountId: LocalAccountId,
+        fileId: ProviderFileId,
+    ): Result<CloudFile>
 
     suspend fun search(query: SearchQuery): Result<SearchResultPage>
 
@@ -156,15 +158,24 @@ interface CloudProvider {
         conflictStrategy: ConflictStrategy = ConflictStrategy.KEEP_BOTH,
     ): Result<CloudFile>
 
-    suspend fun trash(accountId: LocalAccountId, fileId: ProviderFileId): Result<Unit>
+    suspend fun trash(
+        accountId: LocalAccountId,
+        fileId: ProviderFileId,
+    ): Result<Unit>
 
-    suspend fun restore(accountId: LocalAccountId, fileId: ProviderFileId): Result<Unit>
+    suspend fun restore(
+        accountId: LocalAccountId,
+        fileId: ProviderFileId,
+    ): Result<Unit>
 
     /**
      * Permanent deletion. Irreversible; the UI must confirm and must state that
      * it cannot be undone.
      */
-    suspend fun deletePermanently(accountId: LocalAccountId, fileId: ProviderFileId): Result<Unit>
+    suspend fun deletePermanently(
+        accountId: LocalAccountId,
+        fileId: ProviderFileId,
+    ): Result<Unit>
 
     suspend fun emptyTrash(accountId: LocalAccountId): Result<Unit>
 
@@ -264,7 +275,10 @@ interface CloudProvider {
     fun watchForChanges(accountId: LocalAccountId): Flow<Unit>
 
     /** Account-scoped watch for one file. Same best-effort contract. */
-    fun watchFile(accountId: LocalAccountId, fileId: ProviderFileId): Flow<FileChange>
+    fun watchFile(
+        accountId: LocalAccountId,
+        fileId: ProviderFileId,
+    ): Flow<FileChange>
 }
 
 enum class ConflictStrategy {
@@ -276,10 +290,16 @@ enum class ConflictStrategy {
 
 sealed interface FileChange {
     data object Modified : FileChange
+
     data object Trashed : FileChange
+
     data object Restored : FileChange
+
     data object Deleted : FileChange
+
     data class Renamed(val newName: String) : FileChange
+
     data class Moved(val newParentFolderId: ProviderFileId?) : FileChange
+
     data class Replaced(val newFileId: ProviderFileId) : FileChange
 }

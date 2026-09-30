@@ -28,7 +28,6 @@ import kotlinx.coroutines.flow.Flow
  */
 @Dao
 interface FileDao {
-
     // -----------------------------------------------------------------------
     // Listing
     // -----------------------------------------------------------------------
@@ -58,13 +57,19 @@ interface FileDao {
         "SELECT * FROM file_metadata " +
             "WHERE account_id = :accountId AND file_id = :fileId LIMIT 1",
     )
-    suspend fun findByFileId(accountId: Long, fileId: String): FileMetadataEntity?
+    suspend fun findByFileId(
+        accountId: Long,
+        fileId: String,
+    ): FileMetadataEntity?
 
     @Query(
         "SELECT * FROM file_metadata " +
             "WHERE account_id = :accountId AND local_id = :localId LIMIT 1",
     )
-    suspend fun findByLocalId(accountId: Long, localId: Long): FileMetadataEntity?
+    suspend fun findByLocalId(
+        accountId: Long,
+        localId: Long,
+    ): FileMetadataEntity?
 
     /**
      * A page of one account's recent files, across all folders.
@@ -174,7 +179,10 @@ interface FileDao {
      * another account.
      */
     @Query("DELETE FROM file_metadata WHERE account_id = :accountId AND file_id = :fileId")
-    suspend fun deleteByFileId(accountId: Long, fileId: String)
+    suspend fun deleteByFileId(
+        accountId: Long,
+        fileId: String,
+    )
 
     // -----------------------------------------------------------------------
     // Recents, bounded
@@ -202,10 +210,18 @@ interface FileDao {
             "SELECT rowid FROM recent_file WHERE account_id = :accountId " +
             "ORDER BY last_accessed_at DESC LIMIT :max)",
     )
-    suspend fun pruneRecent(accountId: Long, max: Int)
+    suspend fun pruneRecent(
+        accountId: Long,
+        max: Int,
+    )
 
     @Transaction
-    suspend fun recordAccess(accountId: Long, fileId: String, at: Long, max: Int = MAX_RECENT) {
+    suspend fun recordAccess(
+        accountId: Long,
+        fileId: String,
+        at: Long,
+        max: Int = MAX_RECENT,
+    ) {
         upsertRecent(RecentFileEntity(accountId, fileId, at))
         pruneRecent(accountId, max)
     }
@@ -218,14 +234,20 @@ interface FileDao {
     suspend fun upsertFavorite(favorite: FavoriteFileEntity)
 
     @Query("DELETE FROM favorite_file WHERE account_id = :accountId AND file_id = :fileId")
-    suspend fun deleteFavorite(accountId: Long, fileId: String)
+    suspend fun deleteFavorite(
+        accountId: Long,
+        fileId: String,
+    )
 
     // -----------------------------------------------------------------------
     // Sync state
     // -----------------------------------------------------------------------
 
     @Query("SELECT * FROM sync_state WHERE account_id = :accountId AND scope_key = :scopeKey")
-    suspend fun findSyncState(accountId: Long, scopeKey: String): SyncStateEntity?
+    suspend fun findSyncState(
+        accountId: Long,
+        scopeKey: String,
+    ): SyncStateEntity?
 
     @Upsert
     suspend fun upsertSyncState(state: SyncStateEntity)

@@ -37,7 +37,6 @@ import com.unifiedcloud.filemanager.domain.model.ProviderId
  * [map] and [AppError.Unknown].
  */
 object DriveErrors {
-
     // Named rather than written inline in the `when` below, because a bare `403`
     // in a mapper is exactly the thing ER-5 warns about: a status code that looks
     // self-explanatory and is not.
@@ -135,14 +134,21 @@ object DriveErrors {
      * never succeed, and [AppError.Unknown] is never retried
      * (`Architecture.md` §21.3), so it cannot become a retry storm either.
      */
-    fun map(failure: DriveHttpFailure, context: DriveOperationContext): AppError = when (failure.httpStatus) {
-        HTTP_UNAUTHORIZED -> authenticationFailed(failure)
-        HTTP_FORBIDDEN -> forbidden(failure, context)
-        HTTP_NOT_FOUND -> notFound(context)
-        HTTP_TOO_MANY_REQUESTS -> rateLimited(failure)
-        in HTTP_SERVER_ERROR_FLOOR..HTTP_SERVER_ERROR_CEILING -> AppError.ProviderUnavailable(ProviderId.GOOGLE_DRIVE)
-        else -> AppError.Unknown("Drive returned HTTP ${failure.httpStatus}", null)
-    }
+    fun map(
+        failure: DriveHttpFailure,
+        context: DriveOperationContext,
+    ): AppError =
+        when (failure.httpStatus) {
+            HTTP_UNAUTHORIZED -> authenticationFailed(failure)
+            HTTP_FORBIDDEN -> forbidden(failure, context)
+            HTTP_NOT_FOUND -> notFound(context)
+            HTTP_TOO_MANY_REQUESTS -> rateLimited(failure)
+            in HTTP_SERVER_ERROR_FLOOR..HTTP_SERVER_ERROR_CEILING ->
+                AppError.ProviderUnavailable(
+                    ProviderId.GOOGLE_DRIVE,
+                )
+            else -> AppError.Unknown("Drive returned HTTP ${failure.httpStatus}", null)
+        }
 
     /**
      * `401`. The token was rejected.
@@ -170,7 +176,10 @@ object DriveErrors {
      * reason. Getting it wrong is the difference between "wait" and "this file
      * isn't yours" and "reconnect your account".
      */
-    private fun forbidden(failure: DriveHttpFailure, context: DriveOperationContext): AppError =
+    private fun forbidden(
+        failure: DriveHttpFailure,
+        context: DriveOperationContext,
+    ): AppError =
         when (failure.reason) {
             REASON_USER_RATE_LIMIT_EXCEEDED -> rateLimited(failure)
             REASON_INSUFFICIENT_STORAGE -> storageExhausted()
@@ -200,12 +209,13 @@ object DriveErrors {
      * exactly the `Rules.md` §1 framing this product may never use, so the
      * figures are omitted rather than guessed.
      */
-    private fun storageExhausted(): AppError = AppError.QuotaExceeded(
-        providerId = ProviderId.GOOGLE_DRIVE,
-        scope = QuotaScope.STORAGE,
-        limitBytes = null,
-        usedBytes = null,
-    )
+    private fun storageExhausted(): AppError =
+        AppError.QuotaExceeded(
+            providerId = ProviderId.GOOGLE_DRIVE,
+            scope = QuotaScope.STORAGE,
+            limitBytes = null,
+            usedBytes = null,
+        )
 
     /**
      * `404`. Drive reports "does not exist" and "exists but is not shared with
@@ -221,8 +231,9 @@ object DriveErrors {
      * worth inventing one for.
      */
     private fun notFound(context: DriveOperationContext): AppError {
-        val fileId = context.fileId
-            ?: return AppError.Unknown("Drive returned 404 for an operation with no file id", null)
+        val fileId =
+            context.fileId
+                ?: return AppError.Unknown("Drive returned 404 for an operation with no file id", null)
         return AppError.FileNotFound(
             FileRef(
                 provider = ProviderId.GOOGLE_DRIVE,
@@ -239,10 +250,12 @@ object DriveErrors {
      * (`Rules.md` RT-4): if Drive says when it will accept us, substituting our
      * own backoff means the next call fails for a reason we caused.
      */
-    private fun rateLimited(failure: DriveHttpFailure): AppError = AppError.RateLimited(
-        retryAfterMillis = (failure.retryAfterMillis ?: DEFAULT_RETRY_AFTER_MILLIS)
-            .coerceIn(0L, MAX_RETRY_AFTER_MILLIS),
-    )
+    private fun rateLimited(failure: DriveHttpFailure): AppError =
+        AppError.RateLimited(
+            retryAfterMillis =
+                (failure.retryAfterMillis ?: DEFAULT_RETRY_AFTER_MILLIS)
+                    .coerceIn(0L, MAX_RETRY_AFTER_MILLIS),
+        )
 
     /**
      * Wraps a transport failure.
@@ -253,8 +266,10 @@ object DriveErrors {
      * transport failures too: read the real signal, do not pattern-match a
      * string. **Not yet wired** - `DriveApi` is blocked behind Q-01.
      */
-    fun network(cause: TransportCause, retryable: Boolean): AppError =
-        AppError.Network(cause = cause, retryable = retryable)
+    fun network(
+        cause: TransportCause,
+        retryable: Boolean,
+    ): AppError = AppError.Network(cause = cause, retryable = retryable)
 
     /**
      * Extracts the `reason` from a Google JSON error body, tolerantly.
@@ -287,7 +302,10 @@ object DriveErrors {
      * `ReturnCount` ceiling: a single linear scan with six exits is harder to
      * read than a scan with two.
      */
-    private fun quotedValueStart(body: String, field: String): Int? {
+    private fun quotedValueStart(
+        body: String,
+        field: String,
+    ): Int? {
         val key = body.indexOf(field)
         if (key < 0) return null
 

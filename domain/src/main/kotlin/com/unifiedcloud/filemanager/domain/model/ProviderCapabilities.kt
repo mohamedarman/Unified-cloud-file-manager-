@@ -44,53 +44,56 @@ data class ProviderCapabilities(
      * The features that are definitely unavailable, for a single explanatory
      * message rather than a scatter of dead buttons (PC-4).
      */
-    fun unavailableFeatures(): Set<Feature> = buildSet {
-        if (canSearch != true) add(Feature.SEARCH)
-        if (canWrite != true) add(Feature.WRITE)
-        if (canReadRevisions != true) add(Feature.REVISIONS)
-        if (canDownloadBytes != true) add(Feature.DOWNLOAD)
-        if (canStar != true) add(Feature.STAR)
-        if (canExport != true) add(Feature.EXPORT)
-        if (grantsOfflineAccess != true) add(Feature.OFFLINE)
-    }
+    fun unavailableFeatures(): Set<Feature> =
+        buildSet {
+            if (canSearch != true) add(Feature.SEARCH)
+            if (canWrite != true) add(Feature.WRITE)
+            if (canReadRevisions != true) add(Feature.REVISIONS)
+            if (canDownloadBytes != true) add(Feature.DOWNLOAD)
+            if (canStar != true) add(Feature.STAR)
+            if (canExport != true) add(Feature.EXPORT)
+            if (grantsOfflineAccess != true) add(Feature.OFFLINE)
+        }
 
     companion object {
         /**
          * Nothing is known. The correct starting state before
          * `CloudProvider.getCapabilities` has answered.
          */
-        val UNKNOWN = ProviderCapabilities(
-            canReadFiles = null,
-            canWriteFiles = null,
-            canCreateFolders = null,
-            canRename = null,
-            canTrash = null,
-            canSearch = null,
-            canReadRevisions = null,
-            canStar = null,
-            canDownloadBytes = null,
-            grantsOfflineAccess = null,
-            canExport = null,
-        )
+        val UNKNOWN =
+            ProviderCapabilities(
+                canReadFiles = null,
+                canWriteFiles = null,
+                canCreateFolders = null,
+                canRename = null,
+                canTrash = null,
+                canSearch = null,
+                canReadRevisions = null,
+                canStar = null,
+                canDownloadBytes = null,
+                grantsOfflineAccess = null,
+                canExport = null,
+            )
 
         /**
          * A read-only credential: everything that mutates is off, everything that
          * observes is on. This is the shape a `drive.readonly` grant produces
          * (V-05, DEC-04).
          */
-        val READ_ONLY = ProviderCapabilities(
-            canReadFiles = true,
-            canWriteFiles = false,
-            canCreateFolders = false,
-            canRename = false,
-            canTrash = false,
-            canSearch = true,
-            canReadRevisions = true,
-            canStar = true,
-            canDownloadBytes = true,
-            grantsOfflineAccess = true,
-            canExport = true,
-        )
+        val READ_ONLY =
+            ProviderCapabilities(
+                canReadFiles = true,
+                canWriteFiles = false,
+                canCreateFolders = false,
+                canRename = false,
+                canTrash = false,
+                canSearch = true,
+                canReadRevisions = true,
+                canStar = true,
+                canDownloadBytes = true,
+                grantsOfflineAccess = true,
+                canExport = true,
+            )
     }
 }
 

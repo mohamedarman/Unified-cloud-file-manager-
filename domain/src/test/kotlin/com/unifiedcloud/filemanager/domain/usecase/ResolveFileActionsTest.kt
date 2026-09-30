@@ -19,7 +19,6 @@ import org.junit.Test
  * errors.
  */
 class ResolveFileActionsTest {
-
     private val accountId = LocalAccountId(1)
 
     private fun file(
@@ -29,11 +28,12 @@ class ResolveFileActionsTest {
         owned: Boolean = true,
         trashed: Boolean = false,
     ) = CloudFile(
-        ref = FileRef(
-            provider = ProviderId.GOOGLE_DRIVE,
-            accountId = accountId,
-            fileId = ProviderFileId("file-1"),
-        ),
+        ref =
+            FileRef(
+                provider = ProviderId.GOOGLE_DRIVE,
+                accountId = accountId,
+                fileId = ProviderFileId("file-1"),
+            ),
         name = name,
         mimeType = mimeType,
         sizeBytes = if (isFolder) null else 1024,
@@ -229,17 +229,18 @@ class ResolveFileActionsTest {
         assertEquals(Feature.WRITE, reason.feature)
     }
 
-    private fun fullWrite() = ProviderCapabilities(
-        canReadFiles = true,
-        canWriteFiles = true,
-        canCreateFolders = true,
-        canRename = true,
-        canTrash = true,
-        canSearch = true,
-        canReadRevisions = true,
-        canStar = true,
-        canDownloadBytes = true,
-        grantsOfflineAccess = true,
-        canExport = true,
-    )
+    private fun fullWrite() =
+        ProviderCapabilities(
+            canReadFiles = true,
+            canWriteFiles = true,
+            canCreateFolders = true,
+            canRename = true,
+            canTrash = true,
+            canSearch = true,
+            canReadRevisions = true,
+            canStar = true,
+            canDownloadBytes = true,
+            grantsOfflineAccess = true,
+            canExport = true,
+        )
 }

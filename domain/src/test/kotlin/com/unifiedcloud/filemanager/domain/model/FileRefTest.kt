@@ -15,7 +15,6 @@ import org.junit.Test
  * below cover the parts that remain runtime-observable.
  */
 class FileRefTest {
-
     private val google = ProviderId.GOOGLE_DRIVE
 
     @Test
@@ -96,15 +95,15 @@ class FileRefTest {
  * Rules.md §1 and PS-1/PS-2 are contractual, so the guard is asserted.
  */
 class QuotaUsageTest {
-
     @Test
     fun `description attributes usage to the provider, not to this app`() {
-        val usage = QuotaUsage(
-            providerId = ProviderId.GOOGLE_DRIVE,
-            usedBytes = 12_000_000_000,
-            limitBytes = 15_000_000_000,
-            manageUrl = null,
-        )
+        val usage =
+            QuotaUsage(
+                providerId = ProviderId.GOOGLE_DRIVE,
+                usedBytes = 12_000_000_000,
+                limitBytes = 15_000_000_000,
+                manageUrl = null,
+            )
 
         val text = usage.describe()
 

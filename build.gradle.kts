@@ -81,46 +81,47 @@ tasks.register<Delete>("clean") {
 // comment and cannot be broken by a reformat. An earlier version of this task
 // string-matched "kotlin-jvm" in the build file, which was both fragile and
 // quietly wrong - the file says `libs.plugins.kotlin.jvm`.
+val domainProject = project(":domain")
+val hasJvmPlugin = domainProject.plugins.hasPlugin("org.jetbrains.kotlin.jvm")
+val appliedBannedPlugins = listOf(
+    "org.jetbrains.kotlin.android",
+    "com.android.application",
+    "com.android.library",
+    "com.android.dynamic-feature",
+).filter { domainProject.plugins.hasPlugin(it) }
+
+val bannedPrefixes = listOf(
+    "androidx.",
+    "com.google.firebase",
+    "com.google.android.gms",
+    "com.google.android.material",
+)
+val declaredBannedDependencies = domainProject.configurations.flatMap { config ->
+    config.dependencies.filter { dep -> bannedPrefixes.any { dep.name.startsWith(it) } }
+        .map { dep -> ":${config.name} declares '${dep.name}'" }
+}
+
 val verifyDomainPurity by tasks.registering {
     group = "verification"
     description = "Fails if :domain is not a pure Kotlin JVM module, or if it depends on Android."
 
+    inputs.property("hasJvmPlugin", hasJvmPlugin)
+    inputs.property("appliedBannedPlugins", appliedBannedPlugins)
+    inputs.property("declaredBannedDependencies", declaredBannedDependencies)
+
     doLast {
-        val domain = project(":domain")
         val errors = mutableListOf<String>()
 
-        if (!domain.plugins.hasPlugin("org.jetbrains.kotlin.jvm")) {
+        if (!hasJvmPlugin) {
             errors += ":domain does not apply org.jetbrains.kotlin.jvm. It must be a pure JVM module."
         }
 
-        listOf(
-            "org.jetbrains.kotlin.android",
-            "com.android.application",
-            "com.android.library",
-            "com.android.dynamic-feature",
-        ).forEach { id ->
-            if (domain.plugins.hasPlugin(id)) {
-                errors += ":domain must not apply '$id' (Rules.md L-1)."
-            }
+        appliedBannedPlugins.forEach { id ->
+            errors += ":domain must not apply '$id' (Rules.md L-1)."
         }
 
-        // Declared dependencies, read without resolving them - so this check
-        // needs no network and no SDK, and cannot pass merely because a
-        // repository was unreachable. Catches an AndroidX artifact sneaking in
-        // even with no Android plugin applied (Rules.md L-2).
-        val bannedPrefixes = listOf(
-            "androidx.",
-            "com.google.firebase",
-            "com.google.android.gms",
-            "com.google.android.material",
-        )
-        domain.configurations.forEach { configuration ->
-            configuration.dependencies.forEach { dependency ->
-                if (bannedPrefixes.any { dependency.name.startsWith(it) }) {
-                    errors += ":${configuration.name} declares '${dependency.name}', " +
-                        "which is an Android dependency (Rules.md L-2)."
-                }
-            }
+        declaredBannedDependencies.forEach { dep ->
+            errors += "$dep, which is an Android dependency (Rules.md L-2)."
         }
 
         if (errors.isNotEmpty()) {
@@ -157,16 +158,18 @@ val bannedPhrases = listOf(
     "storage pool",
 )
 
+val rootDir = rootProject.projectDir
+
 val scanProhibitedPhrasing by tasks.registering {
     group = "verification"
     description = "Rejects any banned storage claim in source, resources, or analytics names."
 
     val roots = listOf(
-        rootProject.projectDir.resolve("app/src"),
-        rootProject.projectDir.resolve("data/src"),
-        rootProject.projectDir.resolve("cloud/src"),
-        rootProject.projectDir.resolve("core/src"),
-        rootProject.projectDir.resolve("domain/src"),
+        rootDir.resolve("app/src"),
+        rootDir.resolve("data/src"),
+        rootDir.resolve("cloud/src"),
+        rootDir.resolve("core/src"),
+        rootDir.resolve("domain/src"),
     )
     val terms = bannedPhrases
     val excludedDirNames = setOf("build", ".git", "node_modules")
@@ -184,7 +187,7 @@ val scanProhibitedPhrasing by tasks.registering {
                     val lower = file.readText().lowercase()
                     for (term in terms) {
                         if (lower.contains(term)) {
-                            findings += "${file.relativeTo(rootProject.projectDir)}: contains banned phrase \"$term\""
+                            findings += "${file.relativeTo(rootDir)}: contains banned phrase \"$term\""
                         }
                     }
                 }
@@ -207,10 +210,10 @@ val scanApkSecrets by tasks.registering {
     description = "Fails if a client secret or token-shaped literal is committed to source."
 
     val roots = listOf(
-        rootProject.projectDir.resolve("app/src"),
-        rootProject.projectDir.resolve("data/src"),
-        rootProject.projectDir.resolve("cloud/src"),
-        rootProject.projectDir.resolve("core/src"),
+        rootDir.resolve("app/src"),
+        rootDir.resolve("data/src"),
+        rootDir.resolve("cloud/src"),
+        rootDir.resolve("core/src"),
     )
     val excludedDirNames = setOf("build", ".git", "test", "androidTest")
 
@@ -237,7 +240,7 @@ val scanApkSecrets by tasks.registering {
                     val text = file.readText()
                     for (pattern in secretPatterns) {
                         if (pattern.containsMatchIn(text)) {
-                            findings += "${file.relativeTo(rootProject.projectDir)}: matches ${pattern.pattern}"
+                            findings += "${file.relativeTo(rootDir)}: matches ${pattern.pattern}"
                         }
                     }
                 }
@@ -283,7 +286,7 @@ val verifySourceEncoding by tasks.registering {
         val findings = mutableListOf<String>()
 
         for (module in roots) {
-            val root = rootProject.projectDir.resolve(module).resolve("src")
+            val root = rootDir.resolve(module).resolve("src")
             if (!root.exists()) continue
             root.walkTopDown()
                 .onEnter { it.name !in excludedDirNames }
@@ -296,12 +299,12 @@ val verifySourceEncoding by tasks.registering {
                         bytes[1] == 0xBB.toByte() &&
                         bytes[2] == 0xBF.toByte()
                     ) {
-                        findings += "${file.relativeTo(rootProject.projectDir)}: starts with a UTF-8 BOM"
+                        findings += "${file.relativeTo(rootDir)}: starts with a UTF-8 BOM"
                     }
                     bytes.forEachIndexed { index, byte ->
                         if (byte == 0.toByte()) {
                             val offset = index
-                            findings += "${file.relativeTo(rootProject.projectDir)}: " +
+                            findings += "${file.relativeTo(rootDir)}: " +
                                 "NUL byte at offset $offset - git will treat this file as binary. " +
                                 "Use an escape (\\u0000), not a literal control character."
                             return@forEachIndexed

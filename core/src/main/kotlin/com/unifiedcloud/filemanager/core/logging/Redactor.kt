@@ -18,7 +18,6 @@ package com.unifiedcloud.filemanager.core.logging
  * unit-testable in a plain JVM module and can be reused by any sink.
  */
 object Redactor {
-
     /**
      * A short, stable hash of a file identity.
      *
@@ -28,7 +27,10 @@ object Redactor {
      * still an identifier, and 12 hex characters is ample for correlation while
      * being far harder to brute-force against a known file-name list.
      */
-    fun fileRefTag(accountId: Long, fileId: String): String {
+    fun fileRefTag(
+        accountId: Long,
+        fileId: String,
+    ): String {
         // FNV-1a: cheap, dependency-free, and adequate for a correlation tag.
         // This is explicitly not a security primitive and must never be used as
         // one - the file id is not a secret, it is simply not for logs.
@@ -47,12 +49,13 @@ object Redactor {
      * it exists so a log line can say "using token ending ab12" without carrying
      * a usable credential.
      */
-    fun maskSecret(secret: String?): String = when {
-        secret == null -> "<null>"
-        secret.isEmpty() -> "<empty>"
-        secret.length <= 4 -> "<redacted>"
-        else -> "<redacted:${secret.takeLast(4)}>"
-    }
+    fun maskSecret(secret: String?): String =
+        when {
+            secret == null -> "<null>"
+            secret.isEmpty() -> "<empty>"
+            secret.length <= 5 -> "<redacted>"
+            else -> "<redacted:${secret.takeLast(4)}>"
+        }
 
     /**
      * Strips a document URI down to its scheme and authority.
@@ -94,16 +97,17 @@ object Redactor {
      * credential shape, so the primary defence remains passing masked values in
      * from the start.
      */
-    fun scrub(message: String): String = message
-        .replace(TOKEN_PATTERNS.first, "<redacted>")
-        .replace(TOKEN_PATTERNS.second, "<redacted>")
-        .replace(TOKEN_PATTERNS.third, "<redacted>")
+    fun scrub(message: String): String =
+        TOKEN_PATTERNS.fold(message) { acc, regex ->
+            acc.replace(regex, "<redacted>")
+        }
 
-    private val TOKEN_PATTERNS = listOf(
-        Regex("""ya29\.[A-Za-z0-9._-]{10,}"""),
-        Regex("""1//[A-Za-z0-9._-]{20,}"""),
-        Regex("""GOCSPX-[A-Za-z0-9_-]{10,}"""),
-    )
+    private val TOKEN_PATTERNS =
+        listOf(
+            Regex("""ya29\.[A-Za-z0-9._-]{10,}"""),
+            Regex("""1//[A-Za-z0-9._-]{20,}"""),
+            Regex("""GOCSPX-[A-Za-z0-9_-]{10,}"""),
+        )
 
     /**
      * The separator between account id and file id in the hashed input.

@@ -33,7 +33,6 @@ enum class AccountState {
  * [AccountEvent.ConsentAbandoned] and [AccountEvent.OperationCancelled].
  */
 sealed interface AccountEvent {
-
     /** The user tapped "Add account". */
     data object AddAccountRequested : AccountEvent
 
@@ -110,7 +109,6 @@ enum class TransitionRefusal {
  * intended.
  */
 sealed interface Transition {
-
     /** The state changes. */
     data class Allowed(
         val from: AccountState,
@@ -151,7 +149,6 @@ sealed interface Transition {
  * Pure, and therefore testable without a device, a clock, or a network.
  */
 object AccountStateMachine {
-
     /**
      * The single permitted move from [from] on [event].
      *
@@ -159,56 +156,70 @@ object AccountStateMachine {
      * added: an event with no edge from the current state is refused rather than
      * interpreted generously.
      */
-    fun next(from: AccountState, event: AccountEvent): Transition = when {
-        // SM-5: never a transition, from anywhere. Checked first so no future
-        // edge added below can accidentally acquire one.
-        event is AccountEvent.OperationCancelled ->
-            Transition.Refused(from, event, TransitionRefusal.NOT_PERMITTED_FROM_STATE)
+    fun next(
+        from: AccountState,
+        event: AccountEvent,
+    ): Transition =
+        when {
+            // SM-5: never a transition, from anywhere. Checked first so no future
+            // edge added below can accidentally acquire one.
+            event is AccountEvent.OperationCancelled ->
+                Transition.Refused(from, event, TransitionRefusal.NOT_PERMITTED_FROM_STATE)
 
-        // SM-6: checked before the AUTHORIZING edge so an unverified token
-        // cannot reach CONNECTED by way of a missing case.
-        event is AccountEvent.TokensStored && !event.verifiedByLiveCall ->
-            Transition.Refused(from, event, TransitionRefusal.LIVE_VERIFICATION_REQUIRED)
+            // SM-6: checked before the AUTHORIZING edge so an unverified token
+            // cannot reach CONNECTED by way of a missing case.
+            event is AccountEvent.TokensStored && !event.verifiedByLiveCall ->
+                Transition.Refused(from, event, TransitionRefusal.LIVE_VERIFICATION_REQUIRED)
 
-        else -> edgeFor(from, event)
-            ?.let { Transition.Allowed(from, it, event) }
-            ?: Transition.Refused(from, event, TransitionRefusal.NOT_PERMITTED_FROM_STATE)
-    }
-
-    private fun edgeFor(from: AccountState, event: AccountEvent): AccountState? = when (from) {
-        AccountState.DISCONNECTED -> when (event) {
-            is AccountEvent.AddAccountRequested -> AccountState.AUTHORIZING
-            else -> null
+            else ->
+                edgeFor(from, event)
+                    ?.let { Transition.Allowed(from, it, event) }
+                    ?: Transition.Refused(from, event, TransitionRefusal.NOT_PERMITTED_FROM_STATE)
         }
 
-        AccountState.AUTHORIZING -> when (event) {
-            is AccountEvent.ConsentAbandoned -> AccountState.DISCONNECTED
-            is AccountEvent.TokensStored -> AccountState.CONNECTED
-            else -> null
-        }
+    private fun edgeFor(
+        from: AccountState,
+        event: AccountEvent,
+    ): AccountState? =
+        when (from) {
+            AccountState.DISCONNECTED ->
+                when (event) {
+                    is AccountEvent.AddAccountRequested -> AccountState.AUTHORIZING
+                    else -> null
+                }
 
-        AccountState.CONNECTED -> when (event) {
-            is AccountEvent.AccessTokenExpired -> AccountState.REFRESHING
-            is AccountEvent.ProviderRejectedCredential -> AccountState.REAUTH_REQUIRED
-            is AccountEvent.DisconnectRequested -> AccountState.DISCONNECTED
-            else -> null
-        }
+            AccountState.AUTHORIZING ->
+                when (event) {
+                    is AccountEvent.ConsentAbandoned -> AccountState.DISCONNECTED
+                    is AccountEvent.TokensStored -> AccountState.CONNECTED
+                    else -> null
+                }
 
-        AccountState.REFRESHING -> when (event) {
-            is AccountEvent.RefreshSucceeded -> AccountState.CONNECTED
-            is AccountEvent.RefreshRejected -> AccountState.REAUTH_REQUIRED
-            else -> null
-        }
+            AccountState.CONNECTED ->
+                when (event) {
+                    is AccountEvent.AccessTokenExpired -> AccountState.REFRESHING
+                    is AccountEvent.ProviderRejectedCredential -> AccountState.REAUTH_REQUIRED
+                    is AccountEvent.DisconnectRequested -> AccountState.DISCONNECTED
+                    else -> null
+                }
 
-        // SM-2: only the user's own action moves the account out. Every other
-        // event is refused, which is what "terminal until the user acts" means
-        // when it is enforced rather than described.
-        AccountState.REAUTH_REQUIRED -> when (event) {
-            is AccountEvent.ReconnectRequested -> AccountState.AUTHORIZING
-            is AccountEvent.DisconnectRequested -> AccountState.DISCONNECTED
-            else -> null
+            AccountState.REFRESHING ->
+                when (event) {
+                    is AccountEvent.RefreshSucceeded -> AccountState.CONNECTED
+                    is AccountEvent.RefreshRejected -> AccountState.REAUTH_REQUIRED
+                    else -> null
+                }
+
+            // SM-2: only the user's own action moves the account out. Every other
+            // event is refused, which is what "terminal until the user acts" means
+            // when it is enforced rather than described.
+            AccountState.REAUTH_REQUIRED ->
+                when (event) {
+                    is AccountEvent.ReconnectRequested -> AccountState.AUTHORIZING
+                    is AccountEvent.DisconnectRequested -> AccountState.DISCONNECTED
+                    else -> null
+                }
         }
-    }
 
     /**
      * Whether new operations may be started for an account in this state.
@@ -218,14 +229,15 @@ object AccountStateMachine {
      * instead would throw away a listing the user can still read, and keeping it
      * silently actionable would let a write fail against a dead credential.
      */
-    fun allowsNewOperations(state: AccountState): Boolean = when (state) {
-        AccountState.CONNECTED -> true
-        AccountState.DISCONNECTED,
-        AccountState.AUTHORIZING,
-        AccountState.REFRESHING,
-        AccountState.REAUTH_REQUIRED,
-        -> false
-    }
+    fun allowsNewOperations(state: AccountState): Boolean =
+        when (state) {
+            AccountState.CONNECTED -> true
+            AccountState.DISCONNECTED,
+            AccountState.AUTHORIZING,
+            AccountState.REFRESHING,
+            AccountState.REAUTH_REQUIRED,
+            -> false
+        }
 
     /**
      * Whether mutating actions are permitted in this state.

@@ -1,16 +1,16 @@
 package com.unifiedcloud.filemanager.cloud.google.quota
 
 import com.unifiedcloud.filemanager.domain.model.LocalAccountId
-import java.util.concurrent.CountDownLatch
-import java.util.concurrent.Executors
-import java.util.concurrent.TimeUnit
-import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.concurrent.thread
 
 /**
@@ -22,7 +22,6 @@ import kotlin.concurrent.thread
  * test in this file would still pass.
  */
 class QuotaGovernorTest {
-
     private val alice = LocalAccountId(1)
     private val bob = LocalAccountId(2)
 
@@ -222,11 +221,12 @@ class QuotaGovernorTest {
     fun `the request budget is spent after its allowance`() {
         var now = 0L
         val budget = RequestBudget(windowMillis = 100, requestsPerWindow = 3, clock = { now })
-        val governor = QuotaGovernor(
-            perAccountLimit = 10,
-            globalLimit = 10,
-            requestBudget = budget,
-        )
+        val governor =
+            QuotaGovernor(
+                perAccountLimit = 10,
+                globalLimit = 10,
+                requestBudget = budget,
+            )
 
         repeat(3) { assertEquals(Admission.Granted, governor.tryAcquire(alice)) }
         assertEquals(
@@ -239,11 +239,12 @@ class QuotaGovernorTest {
     fun `the budget refuses without consuming a concurrency slot`() {
         var now = 0L
         val budget = RequestBudget(windowMillis = 100, requestsPerWindow = 1, clock = { now })
-        val governor = QuotaGovernor(
-            perAccountLimit = 1,
-            globalLimit = 1,
-            requestBudget = budget,
-        )
+        val governor =
+            QuotaGovernor(
+                perAccountLimit = 1,
+                globalLimit = 1,
+                requestBudget = budget,
+            )
 
         governor.tryAcquire(alice)
         governor.tryAcquire(alice)
@@ -260,11 +261,12 @@ class QuotaGovernorTest {
     fun `the budget refills when the window rolls over`() {
         var now = 0L
         val budget = RequestBudget(windowMillis = 100, requestsPerWindow = 2, clock = { now })
-        val governor = QuotaGovernor(
-            perAccountLimit = 10,
-            globalLimit = 10,
-            requestBudget = budget,
-        )
+        val governor =
+            QuotaGovernor(
+                perAccountLimit = 10,
+                globalLimit = 10,
+                requestBudget = budget,
+            )
 
         repeat(2) { governor.tryAcquire(alice) }
         assertTrue(governor.tryAcquire(alice) is Admission.Refused)
@@ -278,11 +280,12 @@ class QuotaGovernorTest {
     fun `the window has not rolled over one millisecond early`() {
         var now = 0L
         val budget = RequestBudget(windowMillis = 100, requestsPerWindow = 1, clock = { now })
-        val governor = QuotaGovernor(
-            perAccountLimit = 10,
-            globalLimit = 10,
-            requestBudget = budget,
-        )
+        val governor =
+            QuotaGovernor(
+                perAccountLimit = 10,
+                globalLimit = 10,
+                requestBudget = budget,
+            )
 
         governor.tryAcquire(alice)
         now += 99
@@ -311,9 +314,10 @@ class QuotaGovernorTest {
     fun `withPermit returns the block's value and releases afterwards`() {
         val governor = governor(perAccount = 1, global = 1)
 
-        val result = runTest {
-            governor.withPermit(alice) { "listed" }
-        }
+        val result =
+            runTest {
+                governor.withPermit(alice) { "listed" }
+            }
 
         assertEquals("listed", result)
         assertEquals(0, governor.inFlightTotal())
@@ -325,11 +329,12 @@ class QuotaGovernorTest {
         // no visible cause, which is close to undebuggable.
         val governor = governor(perAccount = 1, global = 1)
 
-        val thrown = runCatching {
-            runTest {
-                governor.withPermit(alice) { throw IllegalStateException("listing failed") }
-            }
-        }.exceptionOrNull()
+        val thrown =
+            runCatching {
+                runTest {
+                    governor.withPermit(alice) { throw IllegalStateException("listing failed") }
+                }
+            }.exceptionOrNull()
 
         assertTrue(thrown is IllegalStateException)
         assertEquals(0, governor.inFlightTotal())
@@ -341,10 +346,11 @@ class QuotaGovernorTest {
         val governor = governor(perAccount = 1, global = 1)
         var ran = false
 
-        val result = runTest {
-            governor.tryAcquire(alice)
-            governor.withPermit(alice) { ran = true }
-        }
+        val result =
+            runTest {
+                governor.tryAcquire(alice)
+                governor.withPermit(alice) { ran = true }
+            }
 
         assertNull(result)
         assertFalse("a refused permit must not run the block", ran)
@@ -358,11 +364,12 @@ class QuotaGovernorTest {
         val attemptsPerThread = 200
         val globalCap = 4
         val perAccountCap = 2
-        val governor = QuotaGovernor(
-            perAccountLimit = perAccountCap,
-            globalLimit = globalCap,
-            requestBudget = RequestBudget(requestsPerWindow = 1_000_000),
-        )
+        val governor =
+            QuotaGovernor(
+                perAccountLimit = perAccountCap,
+                globalLimit = globalCap,
+                requestBudget = RequestBudget(requestsPerWindow = 1_000_000),
+            )
 
         val inFlight = AtomicInteger(0)
         val peak = AtomicInteger(0)
@@ -402,28 +409,30 @@ class QuotaGovernorTest {
     fun `concurrent acquires never exceed the per-account cap`() {
         val threads = 12
         val perAccountCap = 2
-        val governor = QuotaGovernor(
-            perAccountLimit = perAccountCap,
-            globalLimit = 64,
-            requestBudget = RequestBudget(requestsPerWindow = 1_000_000),
-        )
+        val governor =
+            QuotaGovernor(
+                perAccountLimit = perAccountCap,
+                globalLimit = 64,
+                requestBudget = RequestBudget(requestsPerWindow = 1_000_000),
+            )
 
         val peak = AtomicInteger(0)
         val start = CountDownLatch(1)
 
         // Every thread hammers the SAME account, which is the case the
         // per-account cap exists for.
-        val workers = List(threads) {
-            thread {
-                start.await()
-                repeat(300) {
-                    if (governor.tryAcquire(alice) is Admission.Granted) {
-                        peak.updateAndGet { previous -> maxOf(previous, governor.inFlightFor(alice)) }
-                        governor.release(alice)
+        val workers =
+            List(threads) {
+                thread {
+                    start.await()
+                    repeat(300) {
+                        if (governor.tryAcquire(alice) is Admission.Granted) {
+                            peak.updateAndGet { previous -> maxOf(previous, governor.inFlightFor(alice)) }
+                            governor.release(alice)
+                        }
                     }
                 }
             }
-        }
 
         start.countDown()
         workers.forEach { it.join() }

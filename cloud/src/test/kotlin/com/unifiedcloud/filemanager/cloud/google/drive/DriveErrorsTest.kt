@@ -26,7 +26,6 @@ import org.junit.Test
  * exist to catch, and neither would be visible from a status code alone.
  */
 class DriveErrorsTest {
-
     private val account = LocalAccountId(1)
     private val file = ProviderFileId("1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms")
 
@@ -39,31 +38,36 @@ class DriveErrorsTest {
         grantedScopesSuffice = grantedScopesSuffice,
     )
 
-    private fun failure(status: Int, reason: String? = null, retryAfter: Long? = null) =
-        DriveErrors.DriveHttpFailure(
-            httpStatus = status,
-            reason = reason,
-            retryAfterMillis = retryAfter,
-        )
+    private fun failure(
+        status: Int,
+        reason: String? = null,
+        retryAfter: Long? = null,
+    ) = DriveErrors.DriveHttpFailure(
+        httpStatus = status,
+        reason = reason,
+        retryAfterMillis = retryAfter,
+    )
 
     // --- 403: the reason is the whole point ---------------------------------
 
     @Test
     fun `403 with insufficientPermissions and an adequate grant is FILE_NOT_SHARED`() {
-        val error = DriveErrors.map(
-            failure(403, DriveErrors.REASON_INSUFFICIENT_PERMISSIONS),
-            context(grantedScopesSuffice = true),
-        )
+        val error =
+            DriveErrors.map(
+                failure(403, DriveErrors.REASON_INSUFFICIENT_PERMISSIONS),
+                context(grantedScopesSuffice = true),
+            )
 
         assertEquals(AppError.Unauthorized(PermissionReason.FILE_NOT_SHARED), error)
     }
 
     @Test
     fun `403 with insufficientPermissions and an inadequate grant is SCOPE_INSUFFICIENT`() {
-        val error = DriveErrors.map(
-            failure(403, DriveErrors.REASON_INSUFFICIENT_PERMISSIONS),
-            context(grantedScopesSuffice = false),
-        )
+        val error =
+            DriveErrors.map(
+                failure(403, DriveErrors.REASON_INSUFFICIENT_PERMISSIONS),
+                context(grantedScopesSuffice = false),
+            )
 
         assertEquals(AppError.Unauthorized(PermissionReason.SCOPE_INSUFFICIENT), error)
     }
@@ -74,14 +78,16 @@ class DriveErrorsTest {
         // is fixed by the file's owner, the other by changing the app's grant.
         // Collapsing them tells a user to reconnect for a file they were simply
         // never given.
-        val shared = DriveErrors.map(
-            failure(403, DriveErrors.REASON_INSUFFICIENT_PERMISSIONS),
-            context(grantedScopesSuffice = true),
-        )
-        val scope = DriveErrors.map(
-            failure(403, DriveErrors.REASON_INSUFFICIENT_PERMISSIONS),
-            context(grantedScopesSuffice = false),
-        )
+        val shared =
+            DriveErrors.map(
+                failure(403, DriveErrors.REASON_INSUFFICIENT_PERMISSIONS),
+                context(grantedScopesSuffice = true),
+            )
+        val scope =
+            DriveErrors.map(
+                failure(403, DriveErrors.REASON_INSUFFICIENT_PERMISSIONS),
+                context(grantedScopesSuffice = false),
+            )
 
         assertNotEquals(shared, scope)
     }
@@ -90,20 +96,22 @@ class DriveErrorsTest {
     fun `403 userRateLimitExceeded is a rate limit, not a permission error`() {
         // ER-5 in its purest form. Mapping this to a permission error produces an
         // unactionable message and, worse, invites a reconnect that fixes nothing.
-        val error = DriveErrors.map(
-            failure(403, DriveErrors.REASON_USER_RATE_LIMIT_EXCEEDED, retryAfter = 5_000),
-            context(),
-        )
+        val error =
+            DriveErrors.map(
+                failure(403, DriveErrors.REASON_USER_RATE_LIMIT_EXCEEDED, retryAfter = 5_000),
+                context(),
+            )
 
         assertEquals(AppError.RateLimited(5_000), error)
     }
 
     @Test
     fun `403 insufficientStorage is a quota failure, not a permission error`() {
-        val error = DriveErrors.map(
-            failure(403, DriveErrors.REASON_INSUFFICIENT_STORAGE),
-            context(),
-        )
+        val error =
+            DriveErrors.map(
+                failure(403, DriveErrors.REASON_INSUFFICIENT_STORAGE),
+                context(),
+            )
 
         assertTrue(error is AppError.QuotaExceeded)
     }
@@ -113,10 +121,11 @@ class DriveErrorsTest {
         // Drive does not put them in the error body. Inventing them would mean
         // asserting a number about Google's quota that we never measured
         // (V-06, QD-1) and could present as a capacity claim.
-        val error = DriveErrors.map(
-            failure(403, DriveErrors.REASON_INSUFFICIENT_STORAGE),
-            context(),
-        ) as AppError.QuotaExceeded
+        val error =
+            DriveErrors.map(
+                failure(403, DriveErrors.REASON_INSUFFICIENT_STORAGE),
+                context(),
+            ) as AppError.QuotaExceeded
 
         assertNull(error.limitBytes)
         assertNull(error.usedBytes)
@@ -278,16 +287,17 @@ class DriveErrorsTest {
 
     @Test
     fun `neither permission outcome is ever retried`() {
-        val outcomes = listOf(
-            DriveErrors.map(
-                failure(403, DriveErrors.REASON_INSUFFICIENT_PERMISSIONS),
-                context(grantedScopesSuffice = true),
-            ),
-            DriveErrors.map(
-                failure(403, DriveErrors.REASON_INSUFFICIENT_PERMISSIONS),
-                context(grantedScopesSuffice = false),
-            ),
-        )
+        val outcomes =
+            listOf(
+                DriveErrors.map(
+                    failure(403, DriveErrors.REASON_INSUFFICIENT_PERMISSIONS),
+                    context(grantedScopesSuffice = true),
+                ),
+                DriveErrors.map(
+                    failure(403, DriveErrors.REASON_INSUFFICIENT_PERMISSIONS),
+                    context(grantedScopesSuffice = false),
+                ),
+            )
 
         outcomes.forEach { error ->
             assertTrue(
@@ -309,7 +319,8 @@ class DriveErrorsTest {
 
     @Test
     fun `reason is read from a real Google error envelope`() {
-        val body = """
+        val body =
+            """
             {
               "error": {
                 "code": 403,
@@ -323,7 +334,7 @@ class DriveErrorsTest {
                 ]
               }
             }
-        """.trimIndent()
+            """.trimIndent()
 
         assertEquals("insufficientPermissions", DriveErrors.reasonOf(body))
     }
@@ -339,17 +350,18 @@ class DriveErrorsTest {
     fun `reason extraction returns null rather than throwing on hostile input`() {
         // A mapper that throws on a garbage body loses the original failure, and
         // an intercepting proxy returning an HTML error page is not exotic.
-        val hostile = listOf(
-            null,
-            "",
-            "   ",
-            "<html><body>403 Forbidden</body></html>",
-            """{"error":{"code":403,"message":"nope"}}""",
-            """{"error":{"errors":[{"reason":"unterminated}]}}""",
-            """{"error":{"errors":[{"reason":"noColonAfterKey"}}""",
-            """reason""",
-            "\u0000",
-        )
+        val hostile =
+            listOf(
+                null,
+                "",
+                "   ",
+                "<html><body>403 Forbidden</body></html>",
+                """{"error":{"code":403,"message":"nope"}}""",
+                """{"error":{"errors":[{"reason":"unterminated}]}}""",
+                """{"error":{"errors":[{"reason":"noColonAfterKey"}}""",
+                """reason""",
+                "\u0000",
+            )
 
         hostile.forEach { body ->
             assertNull("expected null for <$body>", DriveErrors.reasonOf(body))
@@ -369,11 +381,12 @@ class DriveErrorsTest {
         // AppError out, and the live Drive API is never contacted.
         val body = """{"error":{"errors":[{"reason":"insufficientStorage"}]}}"""
 
-        val failure = DriveErrors.DriveHttpFailure(
-            httpStatus = 403,
-            reason = DriveErrors.reasonOf(body),
-            retryAfterMillis = null,
-        )
+        val failure =
+            DriveErrors.DriveHttpFailure(
+                httpStatus = 403,
+                reason = DriveErrors.reasonOf(body),
+                retryAfterMillis = null,
+            )
 
         assertTrue(DriveErrors.map(failure, context()) is AppError.QuotaExceeded)
     }
