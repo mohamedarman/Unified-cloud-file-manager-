@@ -20,10 +20,19 @@ captures/
 keystore.properties
 google-services.json
 
+# Node
+node_modules/
+dist/
+.vite/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
 # Secrets
 .env
 .env.*
 secrets.properties
+*.local
 
 # IDE
 .idea/

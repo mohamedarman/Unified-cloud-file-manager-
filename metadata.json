@@ -1,0 +1,6 @@
+{
+  "name": "Unified Cloud File Manager",
+  "description": "A unified interface for managing authorized files across multiple Google Accounts with multi-account isolation, gallery view, cross-account search, quota governance, and offline operation queue.",
+  "permissions": [],
+  "capabilities": []
+}
