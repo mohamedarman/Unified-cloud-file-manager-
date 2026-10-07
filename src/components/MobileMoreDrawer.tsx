@@ -22,6 +22,7 @@ import { useFileManager, NavigationTab } from '../context/FileManagerContext';
 import { useAuth } from '../context/AuthContext';
 import { AccountState, PROVIDERS } from '../types';
 import { humanReadableBytes } from '../utils/formatters';
+import { toast } from 'sonner';
 
 interface MobileMoreDrawerProps {
   isOpen: boolean;
@@ -197,12 +198,11 @@ export const MobileMoreDrawer: React.FC<MobileMoreDrawerProps> = ({
           <span>Sandbox Reset</span>
           <button
             onClick={() => {
-              if (confirm('Reset application data to initial multi-cloud demo state?')) {
-                resetAllData();
-                onClose();
-              }
+              resetAllData();
+              toast.success('Application demo data reset to default');
+              onClose();
             }}
-            className="text-slate-500 hover:text-slate-800 flex items-center gap-1 font-medium"
+            className="text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 flex items-center gap-1 font-medium cursor-pointer"
           >
             <RotateCcw className="w-3.5 h-3.5" />
             <span>Reset Demo Data</span>

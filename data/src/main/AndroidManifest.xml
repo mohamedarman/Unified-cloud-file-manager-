@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Library module: no components, no permissions.
+
+    The namespace is declared in data/build.gradle.kts. This manifest exists so
+    the module has an explicit, empty declaration rather than relying on AGP
+    synthesising one - a manifest you can read is better than one you infer.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" />

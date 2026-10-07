@@ -20,6 +20,7 @@ import {
 import { useAuth } from '../../context/AuthContext';
 import { useFileManager } from '../../context/FileManagerContext';
 import { useTheme, ThemeMode } from '../../context/ThemeContext';
+import { toast } from 'sonner';
 
 export const SettingsView: React.FC = () => {
   const { user } = useAuth();
@@ -381,14 +382,8 @@ export const SettingsView: React.FC = () => {
 
             <button
               onClick={() => {
-                if (
-                  confirm(
-                    'Are you sure you want to reset all mock cloud accounts and cached data back to default?'
-                  )
-                ) {
-                  resetAllData();
-                  alert('App data has been reset to defaults.');
-                }
+                resetAllData();
+                toast.success('App mock cloud accounts and cached data have been reset to defaults.');
               }}
               className="px-3 py-1.5 rounded-lg bg-rose-50 dark:bg-rose-950/50 hover:bg-rose-100 dark:hover:bg-rose-900/50 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800 font-medium transition text-xs shrink-0 cursor-pointer"
             >

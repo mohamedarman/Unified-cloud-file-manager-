@@ -48,6 +48,7 @@ export const MultiCloudDashboardView: React.FC = () => {
     alerts,
     costs,
     recommendations,
+    applyRecommendation,
     selectedEnvironment,
     setSelectedEnvironment,
     acknowledgeAlert,
@@ -452,27 +453,43 @@ export const MultiCloudDashboardView: React.FC = () => {
             </div>
 
             <div className="space-y-2">
-              {recommendations.slice(0, 2).map((rec) => (
-                <div
-                  key={rec.id}
-                  className="p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-850/50 flex items-center justify-between gap-3"
-                >
-                  <div className="min-w-0">
-                    <p className="text-xs font-semibold text-slate-800 dark:text-slate-200 truncate">
-                      {rec.title}
-                    </p>
-                    <p className="text-[11px] text-slate-500 truncate mt-0.5">
-                      {rec.description}
-                    </p>
+              {recommendations.slice(0, 2).map((rec) => {
+                const isApplied = rec.status === 'APPLIED';
+                return (
+                  <div
+                    key={rec.id}
+                    className="p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-850/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                  >
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold text-slate-800 dark:text-slate-200 truncate">
+                        {rec.title}
+                      </p>
+                      <p className="text-[11px] text-slate-500 truncate mt-0.5">
+                        {rec.description}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-3 shrink-0">
+                      <div className="text-right">
+                        <span className="text-xs font-bold font-mono text-emerald-600 dark:text-emerald-400 block">
+                          +${rec.estimatedMonthlySavings}/mo
+                        </span>
+                        <span className="text-[10px] text-slate-400 uppercase font-mono">savings</span>
+                      </div>
+                      <button
+                        disabled={isApplied}
+                        onClick={() => applyRecommendation(rec.id)}
+                        className={`px-2.5 py-1 rounded-lg text-xs font-medium transition cursor-pointer ${
+                          isApplied
+                            ? 'bg-slate-200 dark:bg-slate-800 text-slate-500 cursor-not-allowed'
+                            : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-2xs'
+                        }`}
+                      >
+                        {isApplied ? 'Applied' : 'Apply'}
+                      </button>
+                    </div>
                   </div>
-                  <div className="text-right shrink-0">
-                    <span className="text-xs font-bold font-mono text-emerald-600 dark:text-emerald-400 block">
-                      +${rec.estimatedMonthlySavings}/mo
-                    </span>
-                    <span className="text-[10px] text-slate-400 uppercase font-mono">savings</span>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
 

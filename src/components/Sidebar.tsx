@@ -15,6 +15,10 @@ import {
   Layers,
   PanelLeftClose,
   PanelLeft,
+  UserPlus,
+  Compass,
+  HardDrive,
+  WifiOff,
 } from 'lucide-react';
 import { useFileManager, NavigationTab } from '../context/FileManagerContext';
 import { useInfrastructure } from '../context/InfrastructureContext';
@@ -38,8 +42,8 @@ interface NavSection {
   items: NavItem[];
 }
 
-export const Sidebar: React.FC<SidebarProps> = () => {
-  const { currentTab, setCurrentTab, setCurrentFolderId, files } = useFileManager();
+export const Sidebar: React.FC<SidebarProps> = ({ onOpenAddAccount, onOpenTour }) => {
+  const { currentTab, setCurrentTab, setCurrentFolderId, files, accounts } = useFileManager();
   const { alerts, resources } = useInfrastructure();
   const [isCollapsed, setIsCollapsed] = useState(false);
 
@@ -54,7 +58,7 @@ export const Sidebar: React.FC<SidebarProps> = () => {
 
   const navSections: NavSection[] = [
     {
-      title: 'Operations',
+      title: 'Operations & Diagrams',
       items: [
         {
           id: 'dashboard' as NavigationTab,
@@ -63,7 +67,7 @@ export const Sidebar: React.FC<SidebarProps> = () => {
         },
         {
           id: 'infra_topology' as NavigationTab,
-          label: 'Topology Map',
+          label: 'Architecture Diagrams',
           icon: <Layers className="w-4 h-4 shrink-0 text-indigo-500" />,
         },
       ],
@@ -121,19 +125,30 @@ export const Sidebar: React.FC<SidebarProps> = () => {
         },
         {
           id: 'security' as NavigationTab,
-          label: 'Security & Audit',
+          label: 'Security & Redaction',
           icon: <Shield className="w-4 h-4 shrink-0 text-blue-500" />,
         },
       ],
     },
     {
-      title: 'Storage & Assets',
+      title: 'Multi-Cloud Storage',
       items: [
         {
           id: 'files' as NavigationTab,
           label: 'Cloud Storage Files',
           icon: <Folder className="w-4 h-4 shrink-0 text-amber-500" />,
           count: files.filter((f) => !f.isTrashed).length,
+        },
+        {
+          id: 'accounts' as NavigationTab,
+          label: 'Connected Accounts',
+          icon: <HardDrive className="w-4 h-4 shrink-0 text-blue-500" />,
+          count: accounts.length,
+        },
+        {
+          id: 'offline' as NavigationTab,
+          label: 'Offline Vault',
+          icon: <WifiOff className="w-4 h-4 shrink-0 text-emerald-500" />,
         },
       ],
     },
@@ -218,7 +233,27 @@ export const Sidebar: React.FC<SidebarProps> = () => {
       </div>
 
       {/* Bottom Footer Section */}
-      <div className="p-2 border-t border-slate-200/80 dark:border-slate-800 space-y-0.5">
+      <div className="p-2 border-t border-slate-200/80 dark:border-slate-800 space-y-1">
+        {onOpenAddAccount && !isCollapsed && (
+          <button
+            onClick={onOpenAddAccount}
+            className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/60 border border-blue-200 dark:border-blue-900/40 transition cursor-pointer"
+          >
+            <UserPlus className="w-3.5 h-3.5" />
+            <span>Connect Cloud Drive</span>
+          </button>
+        )}
+
+        {onOpenTour && !isCollapsed && (
+          <button
+            onClick={onOpenTour}
+            className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-xl text-xs font-medium text-slate-600 dark:text-slate-400 hover:bg-slate-200/60 dark:hover:bg-slate-800 transition cursor-pointer"
+          >
+            <Compass className="w-3.5 h-3.5" />
+            <span>Interactive Tour</span>
+          </button>
+        )}
+
         <button
           onClick={() => handleNav('settings')}
           className={`w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl text-xs font-medium transition cursor-pointer ${

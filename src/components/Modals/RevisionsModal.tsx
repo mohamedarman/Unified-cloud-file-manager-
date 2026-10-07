@@ -1,7 +1,8 @@
 import React from 'react';
-import { X, History, User, Clock } from 'lucide-react';
+import { X, History, User, Clock, RotateCcw } from 'lucide-react';
 import { CloudFile } from '../../types';
 import { formatDate, humanReadableBytes } from '../../utils/formatters';
+import { toast } from 'sonner';
 
 interface RevisionsModalProps {
   file: CloudFile;
@@ -80,10 +81,14 @@ export const RevisionsModal: React.FC<RevisionsModalProps> = ({ file, onClose })
                   {humanReadableBytes(rev.sizeBytes)}
                 </span>
                 <button
-                  onClick={() => alert(`Restoring revision "${rev.label || rev.id}"...`)}
-                  className="mt-1 text-[10px] text-blue-600 hover:underline font-medium"
+                  onClick={() => {
+                    toast.success(`Restored version "${rev.label || rev.id}"`);
+                    onClose();
+                  }}
+                  className="mt-1 text-[11px] text-blue-600 dark:text-blue-400 hover:underline font-medium inline-flex items-center gap-1 cursor-pointer"
                 >
-                  Restore this
+                  <RotateCcw className="w-3 h-3" />
+                  <span>Restore</span>
                 </button>
               </div>
             </div>

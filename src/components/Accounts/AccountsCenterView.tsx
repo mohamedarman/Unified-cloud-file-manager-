@@ -16,6 +16,7 @@ import {
 import { useFileManager } from '../../context/FileManagerContext';
 import { AccountState, PROVIDERS } from '../../types';
 import { humanReadableBytes, formatDate } from '../../utils/formatters';
+import { toast } from 'sonner';
 
 interface AccountsCenterViewProps {
   onOpenAddAccount: () => void;
@@ -388,13 +389,8 @@ export const AccountsCenterView: React.FC<AccountsCenterViewProps> = ({
 
                   <button
                     onClick={() => {
-                      if (
-                        confirm(
-                          `Disconnect ${acc.displayName} (${acc.displayEmail})? All stored tokens and file cache for this account will be purged immediately.`
-                        )
-                      ) {
-                        disconnectAccount(acc.localId);
-                      }
+                      disconnectAccount(acc.localId);
+                      toast.success(`Disconnected ${acc.displayName}. Tokens and local cache purged.`);
                     }}
                     className="px-2.5 py-1 text-xs text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg font-medium transition flex items-center gap-1 border border-rose-200 dark:border-rose-900/60 cursor-pointer"
                   >

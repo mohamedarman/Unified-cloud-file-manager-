@@ -14,6 +14,7 @@ import {
   Layers,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { toast } from 'sonner';
 
 export const LoginPage: React.FC = () => {
   const { loginWithGoogle, loginWithEmail, signupWithEmail } = useAuth();
@@ -193,8 +194,8 @@ export const LoginPage: React.FC = () => {
                 {mode === 'signin' && (
                   <button
                     type="button"
-                    onClick={() => alert('Password recovery link sent to your email.')}
-                    className="text-[11px] text-blue-600 hover:underline"
+                    onClick={() => toast.info('Password recovery instructions sent to your email.')}
+                    className="text-[11px] text-blue-600 hover:underline cursor-pointer"
                   >
                     Forgot password?
                   </button>

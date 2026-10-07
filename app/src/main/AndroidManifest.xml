@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Intentionally minimal.
+
+    No components are declared yet: there is no UI code, no provider, and no
+    worker. Declaring an activity or a DocumentsProvider here before the class
+    exists would produce a manifest that references something the build cannot
+    resolve, and an app that appears to have a launcher it cannot start.
+
+    The namespace lives in app/build.gradle.kts, not here (AGP 8 requirement).
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!--
+        Permissions are deliberately absent.
+
+        Every permission requested must be justified against a shipping feature
+        and recorded in the V-02 scope matrix (PRD.md 8, Rules.md 23). Requesting
+        a permission no feature uses is a Play Store policy violation and a
+        consent-screen lie, so the manifest starts empty and grows only when a
+        feature that needs one exists.
+
+        When they are added, note that none of them may be justified as
+        "improves performance" - the storage permissions will be for SAF tree
+        access only, and the app requests no storage permission for its own use,
+        because it stores no file content (Rules.md 2).
+    -->
+
+</manifest>
