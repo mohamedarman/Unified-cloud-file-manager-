@@ -116,18 +116,37 @@ export const OperationalFooter: React.FC<OperationalFooterProps> = ({
         <div
           onClick={() => setCurrentTab('security')}
           className="flex items-center gap-1 text-slate-400 hover:text-slate-200 cursor-pointer transition"
-          title="Security & Compliance Posture"
+          title="Security & Account Isolation Architecture"
         >
           <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-          <span>SOC2 / ISO27001 Passed</span>
+          <span>Zero-Knowledge Isolation</span>
         </div>
 
         <span className="text-slate-700">|</span>
 
-        {/* Global SLA */}
-        <div className="flex items-center gap-1 text-emerald-400">
-          <CheckCircle2 className="w-3 h-3" />
-          <span>99.99% SLA</span>
+        {/* Legal Links */}
+        <div className="flex items-center gap-2 text-slate-400">
+          <button
+            onClick={() => {
+              if (typeof window !== 'undefined') window.location.hash = '#/privacy';
+              setCurrentTab('legal');
+            }}
+            className="hover:text-slate-200 transition cursor-pointer"
+            title="View Privacy Policy and Compliance"
+          >
+            Privacy
+          </button>
+          <span className="text-slate-700">·</span>
+          <button
+            onClick={() => {
+              if (typeof window !== 'undefined') window.location.hash = '#/terms';
+              setCurrentTab('legal');
+            }}
+            className="hover:text-slate-200 transition cursor-pointer"
+            title="View Terms of Service"
+          >
+            Terms
+          </button>
         </div>
 
         <span className="text-slate-700">|</span>

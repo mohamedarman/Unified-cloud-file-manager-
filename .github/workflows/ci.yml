@@ -17,6 +17,8 @@ concurrency:
 
 env:
   GRADLE_OPTS: -Dorg.gradle.jvmargs=-Xmx3g -Dfile.encoding=UTF-8
+  ANDROID_HOME: /usr/local/lib/android/sdk
+  ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
 
 jobs:
   # -------------------------------------------------------------------------
@@ -40,8 +42,23 @@ jobs:
       # Android modules are configured - and AGP fails at CONFIGURATION time
       # without an SDK, long before any of these gates run. Without this step
       # this job would fail for a reason unrelated to what it checks.
+      - name: Accept Android SDK licenses
+        run: |
+          mkdir -p "$ANDROID_HOME/licenses"
+          printf "24333f8a63cbd82ea14e1861ee225939c7f20e57\n893fb8a22d82224b8478fb7fa5148fdb92fd55e6\nd56f5187479451eabf01fb78af6dfcb131a6481e\n" > "$ANDROID_HOME/licenses/android-sdk-license"
+          printf "84831b9409646a918e30573bab4c9c91346d8abd\n" > "$ANDROID_HOME/licenses/android-sdk-preview-license"
+          printf "601085b00ccd4a54464587335ab260c3e10290bf\n" > "$ANDROID_HOME/licenses/android-googletv-license"
+          printf "859f317696f67ef3d7f30a50a5560e7834b43903\n" > "$ANDROID_HOME/licenses/android-sdk-arm-dbt-license"
+          printf "33b6a2b64707f15b6fadd8c374170d9949e7e0d2\n" > "$ANDROID_HOME/licenses/google-gdk-license"
+          printf "d975f751698a77b662f1254ddbeed3901e976f5a\n" > "$ANDROID_HOME/licenses/intel-android-extra-license"
+          printf "e9acab5b5fbb560a72cfa4e23e338b00a0815979\n" > "$ANDROID_HOME/licenses/mips-android-sysimage-license"
+
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          cmdline-tools-version: '11076708'
+          accept-android-sdk-licenses: true
+          packages: 'platform-tools platforms;android-35 build-tools;35.0.0'
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v3
@@ -85,10 +102,25 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - uses: gradle/actions/setup-gradle@v3
+      - name: Accept Android SDK licenses
+        run: |
+          mkdir -p "$ANDROID_HOME/licenses"
+          printf "24333f8a63cbd82ea14e1861ee225939c7f20e57\n893fb8a22d82224b8478fb7fa5148fdb92fd55e6\nd56f5187479451eabf01fb78af6dfcb131a6481e\n" > "$ANDROID_HOME/licenses/android-sdk-license"
+          printf "84831b9409646a918e30573bab4c9c91346d8abd\n" > "$ANDROID_HOME/licenses/android-sdk-preview-license"
+          printf "601085b00ccd4a54464587335ab260c3e10290bf\n" > "$ANDROID_HOME/licenses/android-googletv-license"
+          printf "859f317696f67ef3d7f30a50a5560e7834b43903\n" > "$ANDROID_HOME/licenses/android-sdk-arm-dbt-license"
+          printf "33b6a2b64707f15b6fadd8c374170d9949e7e0d2\n" > "$ANDROID_HOME/licenses/google-gdk-license"
+          printf "d975f751698a77b662f1254ddbeed3901e976f5a\n" > "$ANDROID_HOME/licenses/intel-android-extra-license"
+          printf "e9acab5b5fbb560a72cfa4e23e338b00a0815979\n" > "$ANDROID_HOME/licenses/mips-android-sysimage-license"
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          cmdline-tools-version: '11076708'
+          accept-android-sdk-licenses: true
+          packages: 'platform-tools platforms;android-35 build-tools;35.0.0'
+
+      - uses: gradle/actions/setup-gradle@v3
 
       - name: Build debug APK
         run: ./gradlew assembleDebug
@@ -127,10 +159,25 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - uses: gradle/actions/setup-gradle@v3
+      - name: Accept Android SDK licenses
+        run: |
+          mkdir -p "$ANDROID_HOME/licenses"
+          printf "24333f8a63cbd82ea14e1861ee225939c7f20e57\n893fb8a22d82224b8478fb7fa5148fdb92fd55e6\nd56f5187479451eabf01fb78af6dfcb131a6481e\n" > "$ANDROID_HOME/licenses/android-sdk-license"
+          printf "84831b9409646a918e30573bab4c9c91346d8abd\n" > "$ANDROID_HOME/licenses/android-sdk-preview-license"
+          printf "601085b00ccd4a54464587335ab260c3e10290bf\n" > "$ANDROID_HOME/licenses/android-googletv-license"
+          printf "859f317696f67ef3d7f30a50a5560e7834b43903\n" > "$ANDROID_HOME/licenses/android-sdk-arm-dbt-license"
+          printf "33b6a2b64707f15b6fadd8c374170d9949e7e0d2\n" > "$ANDROID_HOME/licenses/google-gdk-license"
+          printf "d975f751698a77b662f1254ddbeed3901e976f5a\n" > "$ANDROID_HOME/licenses/intel-android-extra-license"
+          printf "e9acab5b5fbb560a72cfa4e23e338b00a0815979\n" > "$ANDROID_HOME/licenses/mips-android-sysimage-license"
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          cmdline-tools-version: '11076708'
+          accept-android-sdk-licenses: true
+          packages: 'platform-tools platforms;android-35 build-tools;35.0.0'
+
+      - uses: gradle/actions/setup-gradle@v3
 
       - name: Domain unit tests
         run: ./gradlew :domain:test --rerun-tasks
@@ -163,10 +210,25 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - uses: gradle/actions/setup-gradle@v3
+      - name: Accept Android SDK licenses
+        run: |
+          mkdir -p "$ANDROID_HOME/licenses"
+          printf "24333f8a63cbd82ea14e1861ee225939c7f20e57\n893fb8a22d82224b8478fb7fa5148fdb92fd55e6\nd56f5187479451eabf01fb78af6dfcb131a6481e\n" > "$ANDROID_HOME/licenses/android-sdk-license"
+          printf "84831b9409646a918e30573bab4c9c91346d8abd\n" > "$ANDROID_HOME/licenses/android-sdk-preview-license"
+          printf "601085b00ccd4a54464587335ab260c3e10290bf\n" > "$ANDROID_HOME/licenses/android-googletv-license"
+          printf "859f317696f67ef3d7f30a50a5560e7834b43903\n" > "$ANDROID_HOME/licenses/android-sdk-arm-dbt-license"
+          printf "33b6a2b64707f15b6fadd8c374170d9949e7e0d2\n" > "$ANDROID_HOME/licenses/google-gdk-license"
+          printf "d975f751698a77b662f1254ddbeed3901e976f5a\n" > "$ANDROID_HOME/licenses/intel-android-extra-license"
+          printf "e9acab5b5fbb560a72cfa4e23e338b00a0815979\n" > "$ANDROID_HOME/licenses/mips-android-sysimage-license"
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          cmdline-tools-version: '11076708'
+          accept-android-sdk-licenses: true
+          packages: 'platform-tools platforms;android-35 build-tools;35.0.0'
+
+      - uses: gradle/actions/setup-gradle@v3
 
       # The Room schema does not exist yet - no @Entity has been written, which
       # is Phase 6 work. This step distinguishes "not implemented yet" from
@@ -230,10 +292,25 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - uses: gradle/actions/setup-gradle@v3
+      - name: Accept Android SDK licenses
+        run: |
+          mkdir -p "$ANDROID_HOME/licenses"
+          printf "24333f8a63cbd82ea14e1861ee225939c7f20e57\n893fb8a22d82224b8478fb7fa5148fdb92fd55e6\nd56f5187479451eabf01fb78af6dfcb131a6481e\n" > "$ANDROID_HOME/licenses/android-sdk-license"
+          printf "84831b9409646a918e30573bab4c9c91346d8abd\n" > "$ANDROID_HOME/licenses/android-sdk-preview-license"
+          printf "601085b00ccd4a54464587335ab260c3e10290bf\n" > "$ANDROID_HOME/licenses/android-googletv-license"
+          printf "859f317696f67ef3d7f30a50a5560e7834b43903\n" > "$ANDROID_HOME/licenses/android-sdk-arm-dbt-license"
+          printf "33b6a2b64707f15b6fadd8c374170d9949e7e0d2\n" > "$ANDROID_HOME/licenses/google-gdk-license"
+          printf "d975f751698a77b662f1254ddbeed3901e976f5a\n" > "$ANDROID_HOME/licenses/intel-android-extra-license"
+          printf "e9acab5b5fbb560a72cfa4e23e338b00a0815979\n" > "$ANDROID_HOME/licenses/mips-android-sysimage-license"
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          cmdline-tools-version: '11076708'
+          accept-android-sdk-licenses: true
+          packages: 'platform-tools platforms;android-35 build-tools;35.0.0'
+
+      - uses: gradle/actions/setup-gradle@v3
 
       - name: Enable KVM
         run: |

@@ -1,6 +1,6 @@
 {
-  "name": "Unified Cloud File Manager",
-  "description": "A unified interface for managing authorized files across multiple Google Accounts with multi-account isolation, gallery view, cross-account search, quota governance, and offline operation queue.",
+  "name": "Unified Cloud File Manager – Multi-Cloud Workspace",
+  "description": "Unified interface for managing authorized files across Google Drive, Microsoft OneDrive, Dropbox, and Box with multi-account isolation, gallery view, cross-cloud search, and offline operation queue.",
   "permissions": [],
   "capabilities": []
 }

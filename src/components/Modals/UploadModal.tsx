@@ -43,23 +43,61 @@ export const UploadModal: React.FC<UploadModalProps> = ({ onClose }) => {
     }
   };
 
+  const MAX_FILE_SIZE = 500 * 1024 * 1024; // 500 MB limit
+  const DANGEROUS_EXTENSIONS = ['.exe', '.bat', '.cmd', '.sh', '.msi', '.vbs', '.scr', '.com'];
+
+  const validateFile = (file: File): string | null => {
+    if (file.size > MAX_FILE_SIZE) {
+      return `File exceeds the maximum upload size of 500 MB (${humanReadableBytes(file.size)}).`;
+    }
+    const nameLower = file.name.toLowerCase();
+    for (const ext of DANGEROUS_EXTENSIONS) {
+      if (nameLower.endsWith(ext)) {
+        return `Files with extension "${ext}" are restricted for security precautions.`;
+      }
+    }
+    return null;
+  };
+
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
     setDragActive(false);
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      setSelectedFile(e.dataTransfer.files[0]);
+      const file = e.dataTransfer.files[0];
+      const valError = validateFile(file);
+      if (valError) {
+        setError(valError);
+        setSelectedFile(null);
+      } else {
+        setSelectedFile(file);
+        setError(null);
+      }
     }
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-      setSelectedFile(e.target.files[0]);
+      const file = e.target.files[0];
+      const valError = validateFile(file);
+      if (valError) {
+        setError(valError);
+        setSelectedFile(null);
+      } else {
+        setSelectedFile(file);
+        setError(null);
+      }
     }
   };
 
   const handleUploadSubmit = async () => {
     if (!selectedFile) return;
+
+    const valError = validateFile(selectedFile);
+    if (valError) {
+      setError(valError);
+      return;
+    }
 
     if (!isUnlimited && selectedFile.size > freeBytes) {
       setError(

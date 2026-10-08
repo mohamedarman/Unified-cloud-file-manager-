@@ -30,6 +30,7 @@ export const SettingsView: React.FC = () => {
     sortBy,
     setSortBy,
     resetAllData,
+    setCurrentTab,
     isMobilePreview,
     setIsMobilePreview,
   } = useFileManager();
@@ -388,6 +389,80 @@ export const SettingsView: React.FC = () => {
               className="px-3 py-1.5 rounded-lg bg-rose-50 dark:bg-rose-950/50 hover:bg-rose-100 dark:hover:bg-rose-900/50 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800 font-medium transition text-xs shrink-0 cursor-pointer"
             >
               Reset All
+            </button>
+          </div>
+        </div>
+
+        {/* Legal, Privacy & Cookie Preferences */}
+        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 shadow-xs space-y-4 transition-colors">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
+                Legal, Privacy & Disclosures
+              </h3>
+              <p className="text-sm font-semibold text-slate-800 dark:text-slate-200 mt-0.5">
+                Compliance & User Rights
+              </p>
+            </div>
+            <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+              GDPR / CCPA Ready
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+            <button
+              type="button"
+              onClick={() => {
+                if (typeof window !== 'undefined') window.location.hash = '#/privacy';
+                setCurrentTab('legal');
+              }}
+              className="p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 hover:border-blue-400 dark:hover:border-blue-600 bg-slate-50/50 dark:bg-slate-850 text-left transition cursor-pointer group"
+            >
+              <div className="font-semibold text-xs text-slate-800 dark:text-slate-200 group-hover:text-blue-600 dark:group-hover:text-blue-400 flex items-center justify-between">
+                <span>Privacy Policy</span>
+                <span className="text-slate-400">→</span>
+              </div>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
+                Read our zero-knowledge data minimization and Google API Limited Use commitments.
+              </p>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                if (typeof window !== 'undefined') window.location.hash = '#/terms';
+                setCurrentTab('legal');
+              }}
+              className="p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 hover:border-blue-400 dark:hover:border-blue-600 bg-slate-50/50 dark:bg-slate-850 text-left transition cursor-pointer group"
+            >
+              <div className="font-semibold text-xs text-slate-800 dark:text-slate-200 group-hover:text-blue-600 dark:group-hover:text-blue-400 flex items-center justify-between">
+                <span>Terms of Service</span>
+                <span className="text-slate-400">→</span>
+              </div>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
+                Review software terms, cloud provider conditions, and acceptable use requirements.
+              </p>
+            </button>
+          </div>
+
+          <div className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-850 rounded-xl border border-slate-200/80 dark:border-slate-800 text-xs">
+            <div>
+              <span className="font-semibold text-slate-800 dark:text-slate-200 block">
+                Manage Cookie & Local Storage Consent
+              </span>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                Reset your storage preferences banner to reconfigure essential or performance cache.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                localStorage.removeItem('ucfm_cookie_consent');
+                toast.info('Storage consent preferences reset. The prompt will reappear on refresh or navigation.');
+              }}
+              className="px-3 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-medium transition cursor-pointer shrink-0"
+            >
+              Reconfigure
             </button>
           </div>
         </div>

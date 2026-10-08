@@ -59,6 +59,9 @@ const LegalComplianceView = lazy(() =>
 const HelpSupportView = lazy(() =>
   import('../Help/HelpSupportView').then((m) => ({ default: m.HelpSupportView }))
 );
+const NotFoundView = lazy(() =>
+  import('../common/NotFoundView').then((m) => ({ default: m.NotFoundView }))
+);
 
 interface ViewRouterProps {
   currentTab: NavigationTab;
@@ -147,7 +150,7 @@ export const ViewRouter: React.FC<ViewRouterProps> = ({
       case 'help':
         return <HelpSupportView />;
       default:
-        return <MultiCloudDashboardView />;
+        return <NotFoundView missingPath={currentTab} />;
     }
   };
 

@@ -26,14 +26,38 @@ export const LoginPage: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [failedAttempts, setFailedAttempts] = useState(0);
+  const [cooldownSeconds, setCooldownSeconds] = useState(0);
+  const [legalModal, setLegalModal] = useState<'privacy' | 'terms' | null>(null);
+
+  // Rate-limiting cooldown countdown effect
+  React.useEffect(() => {
+    if (cooldownSeconds <= 0) return;
+    const timer = setInterval(() => {
+      setCooldownSeconds((prev) => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [cooldownSeconds]);
 
   const handleGoogleSubmit = async () => {
+    if (cooldownSeconds > 0) {
+      setError(`Too many failed attempts. Please wait ${cooldownSeconds}s before retrying.`);
+      return;
+    }
     setIsLoading(true);
     setError(null);
     try {
       await loginWithGoogle('mohamedarman536@gmail.com', 'Mohamed Arman');
+      setFailedAttempts(0);
     } catch (err: any) {
-      setError(err?.message || 'Failed to sign in with Google');
+      const nextFail = failedAttempts + 1;
+      setFailedAttempts(nextFail);
+      if (nextFail >= 5) {
+        setCooldownSeconds(60);
+        setError('Too many failed attempts. Security cooldown active for 60 seconds.');
+      } else {
+        setError(err?.message || 'Failed to sign in with Google');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -41,12 +65,21 @@ export const LoginPage: React.FC = () => {
 
   const handleEmailSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email || !email.includes('@')) {
+    if (cooldownSeconds > 0) {
+      setError(`Too many failed attempts. Please wait ${cooldownSeconds}s before retrying.`);
+      return;
+    }
+    const cleanEmail = email.trim();
+    if (!cleanEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
       setError('Please provide a valid email address.');
       return;
     }
-    if (!password || password.length < 6) {
-      setError('Password must be at least 6 characters.');
+    if (!password || password.length < 8) {
+      setError('Password must be at least 8 characters for account security.');
+      return;
+    }
+    if (cleanEmail.length > 254 || password.length > 128) {
+      setError('Input exceeds maximum allowable length.');
       return;
     }
 
@@ -54,12 +87,26 @@ export const LoginPage: React.FC = () => {
     setError(null);
     try {
       if (mode === 'signup') {
-        await signupWithEmail(email, password, name);
+        const cleanName = name.trim();
+        if (!cleanName) {
+          setError('Please provide your display name.');
+          setIsLoading(false);
+          return;
+        }
+        await signupWithEmail(cleanEmail, password, cleanName);
       } else {
-        await loginWithEmail(email, password);
+        await loginWithEmail(cleanEmail, password);
       }
+      setFailedAttempts(0);
     } catch (err: any) {
-      setError(err?.message || 'Authentication failed. Please verify credentials.');
+      const nextFail = failedAttempts + 1;
+      setFailedAttempts(nextFail);
+      if (nextFail >= 5) {
+        setCooldownSeconds(60);
+        setError('Too many failed attempts. Security cooldown active for 60 seconds.');
+      } else {
+        setError(err?.message || 'Authentication failed. Please verify credentials.');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -295,15 +342,92 @@ export const LoginPage: React.FC = () => {
         </div>
       </main>
 
-      {/* Footer */}
-      <footer className="max-w-2xl w-full mx-auto text-center py-2 text-[11px] text-slate-400 space-y-1">
-        <p>
-          Unified Cloud File Manager does not create, pool, or bypass cloud storage limits.
-        </p>
-        <p>
-          Storage remains owned, metered, and enforced directly by each respective provider.
+      {/* Footer & Legal Agreements */}
+      <footer className="max-w-2xl w-full mx-auto text-center py-3 text-[11px] text-slate-500 space-y-1.5">
+        <div className="flex items-center justify-center gap-3 text-xs">
+          <button
+            type="button"
+            onClick={() => setLegalModal('privacy')}
+            className="text-blue-600 hover:underline font-medium cursor-pointer"
+          >
+            Privacy Policy
+          </button>
+          <span className="text-slate-300">·</span>
+          <button
+            type="button"
+            onClick={() => setLegalModal('terms')}
+            className="text-blue-600 hover:underline font-medium cursor-pointer"
+          >
+            Terms of Service
+          </button>
+        </div>
+        <p className="text-[10px] text-slate-400">
+          Unified Cloud File Manager does not create, pool, or bypass cloud storage limits. Storage remains owned, metered, and enforced directly by each respective provider.
         </p>
       </footer>
+
+      {/* Pre-auth Legal Modal */}
+      {legalModal && (
+        <div
+          onClick={() => setLegalModal(null)}
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-3xl max-w-lg w-full max-h-[85vh] overflow-y-auto p-6 shadow-2xl border border-slate-200 space-y-4"
+          >
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <h3 className="font-bold text-slate-900 text-base">
+                {legalModal === 'privacy' ? 'Privacy Policy' : 'Terms of Service'}
+              </h3>
+              <button
+                onClick={() => setLegalModal(null)}
+                aria-label="Close legal modal"
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-600"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="text-xs text-slate-600 space-y-3 leading-relaxed">
+              {legalModal === 'privacy' ? (
+                <>
+                  <p>
+                    <strong>Data Processing Invariants:</strong> Unified Cloud File Manager processes OAuth credentials and directory metadata strictly within your local browser storage. No user file contents are stored or inspected on central application servers.
+                  </p>
+                  <p>
+                    <strong>Google Limited Use Compliance:</strong> Use of information received from Google APIs strictly adheres to the Google API Services User Data Policy, including the Limited Use requirements.
+                  </p>
+                  <p>
+                    <strong>Multi-Account Isolation:</strong> All connected accounts remain isolated with separate encryption keys and local account identifiers.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p>
+                    <strong>Authorized Use:</strong> You certify that you are authorized to access any connected cloud accounts. You remain bound by each provider's acceptable use policies.
+                  </p>
+                  <p>
+                    <strong>Non-Storage Entity:</strong> The application does not provide or sell storage capacity; it is an orchestration interface.
+                  </p>
+                  <p>
+                    <strong>Disclaimer:</strong> The software is provided "as-is" without warranty. Cloud availability and rate limits depend on third-party provider APIs.
+                  </p>
+                </>
+              )}
+            </div>
+
+            <div className="pt-2 border-t border-slate-100 flex justify-end">
+              <button
+                onClick={() => setLegalModal(null)}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

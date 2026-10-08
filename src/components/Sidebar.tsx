@@ -19,6 +19,7 @@ import {
   Compass,
   HardDrive,
   WifiOff,
+  Scale,
 } from 'lucide-react';
 import { useFileManager, NavigationTab } from '../context/FileManagerContext';
 import { useInfrastructure } from '../context/InfrastructureContext';
@@ -265,6 +266,19 @@ export const Sidebar: React.FC<SidebarProps> = ({ onOpenAddAccount, onOpenTour }
         >
           <Settings className="w-4 h-4 shrink-0" />
           {!isCollapsed && <span>Settings</span>}
+        </button>
+
+        <button
+          onClick={() => handleNav('legal')}
+          className={`w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl text-xs font-medium transition cursor-pointer ${
+            currentTab === 'legal'
+              ? 'bg-blue-600 text-white font-semibold'
+              : 'text-slate-600 dark:text-slate-400 hover:bg-slate-200/60 dark:hover:bg-slate-800'
+          }`}
+          title="Legal & Compliance Disclosures"
+        >
+          <Scale className="w-4 h-4 shrink-0" />
+          {!isCollapsed && <span>Legal & Privacy</span>}
         </button>
 
         <button
