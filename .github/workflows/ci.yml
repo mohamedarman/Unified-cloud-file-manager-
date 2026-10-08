@@ -63,6 +63,9 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v3
 
+      - name: Make gradlew executable
+        run: chmod +x ./gradlew
+
       # Domain purity: :domain must stay a pure Kotlin JVM module (L-1, L-2).
       - name: Verify domain purity
         run: ./gradlew :verifyDomainPurity
@@ -122,6 +125,9 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v3
 
+      - name: Make gradlew executable
+        run: chmod +x ./gradlew
+
       - name: Build debug APK
         run: ./gradlew assembleDebug
 
@@ -179,6 +185,9 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v3
 
+      - name: Make gradlew executable
+        run: chmod +x ./gradlew
+
       - name: Domain unit tests
         run: ./gradlew :domain:test --rerun-tasks
 
@@ -229,6 +238,9 @@ jobs:
           packages: 'platform-tools platforms;android-35 build-tools;35.0.0'
 
       - uses: gradle/actions/setup-gradle@v3
+
+      - name: Make gradlew executable
+        run: chmod +x ./gradlew
 
       # The Room schema does not exist yet - no @Entity has been written, which
       # is Phase 6 work. This step distinguishes "not implemented yet" from
@@ -311,6 +323,9 @@ jobs:
           packages: 'platform-tools platforms;android-35 build-tools;35.0.0'
 
       - uses: gradle/actions/setup-gradle@v3
+
+      - name: Make gradlew executable
+        run: chmod +x ./gradlew
 
       - name: Enable KVM
         run: |

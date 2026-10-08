@@ -9,6 +9,7 @@
 # `text=auto` lets Git detect; `eol=lf` forces LF in the working tree
 # regardless of the user's core.autocrlf setting.
 * text=auto eol=lf
+gradlew text eol=lf
 
 # Files that must never be line-ending normalized.
 #
