@@ -79,7 +79,7 @@ export const FileItemRow: React.FC<FileItemRowProps> = ({
               </span>
             </div>
             <span className="text-[10px] text-slate-400 dark:text-slate-500 block truncate">
-              {fileMeta.label}
+              {fileMeta.label} • {file.isFolder ? 'Folder' : humanReadableBytes(file.sizeBytes)} • {formatDate(file.modifiedTimeMillis)}
             </span>
           </div>
         </div>

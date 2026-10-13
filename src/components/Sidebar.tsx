@@ -1,28 +1,17 @@
 import React, { useState } from 'react';
 import {
-  LayoutDashboard,
-  Server,
-  Cloud,
-  Activity,
-  FileText,
-  AlertTriangle,
-  Shield,
-  DollarSign,
-  Workflow,
   Folder,
+  Image,
+  Search,
+  HardDrive,
   Settings,
   HelpCircle,
-  Layers,
+  Scale,
   PanelLeftClose,
   PanelLeft,
   UserPlus,
-  Compass,
-  HardDrive,
-  WifiOff,
-  Scale,
 } from 'lucide-react';
 import { useFileManager, NavigationTab } from '../context/FileManagerContext';
-import { useInfrastructure } from '../context/InfrastructureContext';
 
 interface SidebarProps {
   onOpenAddAccount?: () => void;
@@ -34,8 +23,6 @@ interface NavItem {
   label: string;
   icon: React.ReactNode;
   count?: number;
-  badge?: number;
-  badgeColor?: string;
 }
 
 interface NavSection {
@@ -43,9 +30,8 @@ interface NavSection {
   items: NavItem[];
 }
 
-export const Sidebar: React.FC<SidebarProps> = ({ onOpenAddAccount, onOpenTour }) => {
-  const { currentTab, setCurrentTab, setCurrentFolderId, files, accounts } = useFileManager();
-  const { alerts, resources } = useInfrastructure();
+export const Sidebar: React.FC<SidebarProps> = ({ onOpenAddAccount }) => {
+  const { currentTab, setCurrentTab, setCurrentFolderId, files } = useFileManager();
   const [isCollapsed, setIsCollapsed] = useState(false);
 
   const handleNav = (tab: NavigationTab) => {
@@ -55,101 +41,35 @@ export const Sidebar: React.FC<SidebarProps> = ({ onOpenAddAccount, onOpenTour }
     }
   };
 
-  const activeAlertsCount = alerts.filter((a) => a.status !== 'RESOLVED').length;
-
   const navSections: NavSection[] = [
     {
-      title: 'Operations & Diagrams',
-      items: [
-        {
-          id: 'dashboard' as NavigationTab,
-          label: 'Dashboard',
-          icon: <LayoutDashboard className="w-4 h-4 shrink-0 text-blue-500" />,
-        },
-        {
-          id: 'infra_topology' as NavigationTab,
-          label: 'Architecture Diagrams',
-          icon: <Layers className="w-4 h-4 shrink-0 text-indigo-500" />,
-        },
-      ],
-    },
-    {
-      title: 'Infrastructure',
-      items: [
-        {
-          id: 'infra_overview' as NavigationTab,
-          label: 'Fleet Overview',
-          icon: <Server className="w-4 h-4 shrink-0 text-emerald-500" />,
-          count: resources.length,
-        },
-        {
-          id: 'providers' as NavigationTab,
-          label: 'Cloud Providers',
-          icon: <Cloud className="w-4 h-4 shrink-0 text-sky-500" />,
-        },
-      ],
-    },
-    {
-      title: 'Observability',
-      items: [
-        {
-          id: 'monitoring_metrics' as NavigationTab,
-          label: 'Live Metrics',
-          icon: <Activity className="w-4 h-4 shrink-0 text-emerald-500" />,
-        },
-        {
-          id: 'monitoring_logs' as NavigationTab,
-          label: 'System Logs',
-          icon: <FileText className="w-4 h-4 shrink-0 text-slate-400" />,
-        },
-        {
-          id: 'monitoring_alerts' as NavigationTab,
-          label: 'Alerts & Health',
-          icon: <AlertTriangle className="w-4 h-4 shrink-0 text-amber-500" />,
-          badge: activeAlertsCount > 0 ? activeAlertsCount : undefined,
-          badgeColor: 'text-amber-600 bg-amber-100 dark:bg-amber-950/80',
-        },
-      ],
-    },
-    {
-      title: 'FinOps & Governance',
-      items: [
-        {
-          id: 'cost_overview' as NavigationTab,
-          label: 'Cost Management',
-          icon: <DollarSign className="w-4 h-4 shrink-0 text-teal-500" />,
-        },
-        {
-          id: 'automation_workflows' as NavigationTab,
-          label: 'Runbooks & Automation',
-          icon: <Workflow className="w-4 h-4 shrink-0 text-purple-500" />,
-        },
-        {
-          id: 'security' as NavigationTab,
-          label: 'Security & Redaction',
-          icon: <Shield className="w-4 h-4 shrink-0 text-blue-500" />,
-        },
-      ],
-    },
-    {
-      title: 'Multi-Cloud Storage',
+      title: 'Cloud File Manager',
       items: [
         {
           id: 'files' as NavigationTab,
-          label: 'Cloud Storage Files',
+          label: 'Files',
           icon: <Folder className="w-4 h-4 shrink-0 text-amber-500" />,
           count: files.filter((f) => !f.isTrashed).length,
         },
         {
-          id: 'accounts' as NavigationTab,
-          label: 'Connected Accounts',
-          icon: <HardDrive className="w-4 h-4 shrink-0 text-blue-500" />,
-          count: accounts.length,
+          id: 'gallery' as NavigationTab,
+          label: 'Gallery',
+          icon: <Image className="w-4 h-4 shrink-0 text-blue-500" />,
         },
         {
-          id: 'offline' as NavigationTab,
-          label: 'Offline Vault',
-          icon: <WifiOff className="w-4 h-4 shrink-0 text-emerald-500" />,
+          id: 'search' as NavigationTab,
+          label: 'Search',
+          icon: <Search className="w-4 h-4 shrink-0 text-indigo-500" />,
+        },
+        {
+          id: 'quotas' as NavigationTab,
+          label: 'Storage',
+          icon: <HardDrive className="w-4 h-4 shrink-0 text-emerald-500" />,
+        },
+        {
+          id: 'settings' as NavigationTab,
+          label: 'More / Settings',
+          icon: <Settings className="w-4 h-4 shrink-0 text-slate-400" />,
         },
       ],
     },
@@ -206,15 +126,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ onOpenAddAccount, onOpenTour }
 
                   {!isCollapsed && (
                     <>
-                      {item.badge !== undefined && (
-                        <span
-                          className={`text-[10px] font-mono px-1.5 py-0.2 rounded font-bold ${
-                            isActive ? 'bg-white/20 text-white' : item.badgeColor
-                          }`}
-                        >
-                          {item.badge}
-                        </span>
-                      )}
                       {item.count !== undefined && (
                         <span
                           className={`text-[11px] font-mono tabular-nums ${
@@ -245,29 +156,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ onOpenAddAccount, onOpenTour }
           </button>
         )}
 
-        {onOpenTour && !isCollapsed && (
-          <button
-            onClick={onOpenTour}
-            className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-xl text-xs font-medium text-slate-600 dark:text-slate-400 hover:bg-slate-200/60 dark:hover:bg-slate-800 transition cursor-pointer"
-          >
-            <Compass className="w-3.5 h-3.5" />
-            <span>Interactive Tour</span>
-          </button>
-        )}
-
-        <button
-          onClick={() => handleNav('settings')}
-          className={`w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl text-xs font-medium transition cursor-pointer ${
-            currentTab === 'settings'
-              ? 'bg-blue-600 text-white font-semibold'
-              : 'text-slate-600 dark:text-slate-400 hover:bg-slate-200/60 dark:hover:bg-slate-800'
-          }`}
-          title="Platform Settings"
-        >
-          <Settings className="w-4 h-4 shrink-0" />
-          {!isCollapsed && <span>Settings</span>}
-        </button>
-
         <button
           onClick={() => handleNav('legal')}
           className={`w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl text-xs font-medium transition cursor-pointer ${
@@ -275,7 +163,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ onOpenAddAccount, onOpenTour }
               ? 'bg-blue-600 text-white font-semibold'
               : 'text-slate-600 dark:text-slate-400 hover:bg-slate-200/60 dark:hover:bg-slate-800'
           }`}
-          title="Legal & Compliance Disclosures"
+          title="Legal & Privacy Disclosures"
         >
           <Scale className="w-4 h-4 shrink-0" />
           {!isCollapsed && <span>Legal & Privacy</span>}

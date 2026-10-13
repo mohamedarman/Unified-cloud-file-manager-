@@ -49,22 +49,22 @@ export const GalleryView: React.FC = () => {
   return (
     <div className="flex-1 flex flex-col h-full overflow-hidden bg-slate-50/50">
       {/* Header */}
-      <div className="bg-white border-b border-slate-200 px-6 py-3 flex items-center justify-between">
+      <div className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-4 sm:px-6 py-3 flex items-center justify-between transition-colors">
         <div>
-          <h2 className="text-base font-semibold text-slate-900">
-            Multi-Account Photo & Video Gallery
+          <h2 className="text-base font-semibold text-slate-900 dark:text-white">
+            Photo & Video Gallery
           </h2>
-          <p className="text-xs text-slate-500">
-            Chronological aggregation with per-item account attribution badge
+          <p className="text-xs text-slate-500 dark:text-slate-400">
+            Photos and videos across connected cloud accounts
           </p>
         </div>
-        <div className="text-xs font-medium text-slate-600 bg-slate-100 px-2.5 py-1 rounded-lg">
+        <div className="text-xs font-medium text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 px-2.5 py-1 rounded-lg">
           {mediaFiles.length} media items
         </div>
       </div>
 
       {/* Media Grid by Date Group */}
-      <div className="flex-1 overflow-y-auto p-6 space-y-8">
+      <div className="flex-1 overflow-y-auto p-4 sm:p-6 pb-28 sm:pb-28 space-y-8 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors">
         {mediaFiles.length === 0 ? (
           <div className="h-64 flex flex-col items-center justify-center text-slate-400 text-center">
             <ImageIcon className="w-12 h-12 text-slate-300 mb-2" />

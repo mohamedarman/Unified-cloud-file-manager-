@@ -84,37 +84,6 @@ export const ViewRouter: React.FC<ViewRouterProps> = ({
 }) => {
   const renderScreen = () => {
     switch (currentTab) {
-      case 'dashboard':
-        return <MultiCloudDashboardView />;
-      case 'infra_overview':
-        return <InfrastructureOverviewView initialTypeFilter="ALL" />;
-      case 'infra_compute':
-        return <InfrastructureOverviewView initialTypeFilter="COMPUTE" />;
-      case 'infra_storage':
-        return <InfrastructureOverviewView initialTypeFilter="STORAGE" />;
-      case 'infra_databases':
-        return <InfrastructureOverviewView initialTypeFilter="DATABASE" />;
-      case 'infra_networks':
-        return <InfrastructureOverviewView initialTypeFilter="NETWORK" />;
-      case 'infra_k8s':
-        return <InfrastructureOverviewView initialTypeFilter="KUBERNETES" />;
-      case 'infra_topology':
-        return <TopologyView />;
-      case 'providers':
-        return <CloudProvidersView />;
-      case 'monitoring_metrics':
-        return <ObservabilityView initialSubTab="metrics" />;
-      case 'monitoring_logs':
-        return <ObservabilityView initialSubTab="logs" />;
-      case 'monitoring_alerts':
-        return <ObservabilityView initialSubTab="alerts" />;
-      case 'monitoring_events':
-        return <ObservabilityView initialSubTab="events" />;
-      case 'cost_overview':
-      case 'cost_optimization':
-        return <CostManagementView />;
-      case 'automation_workflows':
-        return <AutomationView />;
       case 'files':
       case 'starred':
       case 'recent':
@@ -132,25 +101,25 @@ export const ViewRouter: React.FC<ViewRouterProps> = ({
         return <GalleryView />;
       case 'search':
         return <CrossAccountSearchView onOpenDetails={onOpenDetails} />;
-      case 'accounts':
-        return <AccountsCenterView onOpenAddAccount={onOpenAddAccount} />;
-      case 'offline':
-        return <OfflineFilesView onOpenDetails={onOpenDetails} />;
       case 'quotas':
         return <QuotaGovernorView />;
-      case 'operations':
-        return <PendingOperationsView />;
-      case 'security':
-      case 'security_policies':
-        return <SecurityAuditView />;
       case 'settings':
+      case 'accounts':
         return <SettingsView />;
       case 'legal':
         return <LegalComplianceView />;
       case 'help':
         return <HelpSupportView />;
       default:
-        return <NotFoundView missingPath={currentTab} />;
+        return (
+          <FileBrowser
+            onOpenUpload={onOpenUpload}
+            onOpenNewFolder={onOpenNewFolder}
+            onOpenDetails={onOpenDetails}
+            onOpenQuickLook={onOpenQuickLook}
+            onOpenMove={onOpenMove}
+          />
+        );
     }
   };
 

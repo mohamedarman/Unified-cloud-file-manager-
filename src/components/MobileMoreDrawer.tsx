@@ -120,24 +120,16 @@ export const MobileMoreDrawer: React.FC<MobileMoreDrawerProps> = ({
           </span>
           <div className="grid grid-cols-2 gap-2 text-xs">
             <button
-              onClick={() => navigateTo('accounts')}
-              className="p-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 flex items-center gap-2 font-medium text-slate-800 text-left"
+              onClick={() => navigateTo('settings')}
+              className="p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center gap-2 font-medium text-slate-800 dark:text-slate-200 text-left cursor-pointer"
             >
-              <Cloud className="w-4 h-4 text-blue-600 shrink-0" />
-              <span className="truncate">Accounts Center</span>
-            </button>
-
-            <button
-              onClick={() => navigateTo('offline')}
-              className="p-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 flex items-center gap-2 font-medium text-slate-800 text-left"
-            >
-              <WifiOff className="w-4 h-4 text-emerald-600 shrink-0" />
-              <span className="truncate">Offline Vault</span>
+              <Settings className="w-4 h-4 text-slate-600 dark:text-slate-400 shrink-0" />
+              <span className="truncate">Settings & Theme</span>
             </button>
 
             <button
               onClick={() => navigateTo('starred')}
-              className="p-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 flex items-center gap-2 font-medium text-slate-800 text-left"
+              className="p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center gap-2 font-medium text-slate-800 dark:text-slate-200 text-left cursor-pointer"
             >
               <Star className="w-4 h-4 text-amber-500 fill-amber-500 shrink-0" />
               <span className="truncate">Starred Files</span>
@@ -145,50 +137,26 @@ export const MobileMoreDrawer: React.FC<MobileMoreDrawerProps> = ({
 
             <button
               onClick={() => navigateTo('trash')}
-              className="p-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 flex items-center gap-2 font-medium text-slate-800 text-left"
+              className="p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center gap-2 font-medium text-slate-800 dark:text-slate-200 text-left cursor-pointer"
             >
               <Trash2 className="w-4 h-4 text-rose-500 shrink-0" />
               <span className="truncate">Trash Bin</span>
             </button>
 
             <button
-              onClick={() => navigateTo('operations')}
-              className="p-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 flex items-center gap-2 font-medium text-slate-800 text-left"
-            >
-              <ListRestart className="w-4 h-4 text-blue-600 shrink-0" />
-              <span className="truncate">Write Queue</span>
-            </button>
-
-            <button
-              onClick={() => navigateTo('security')}
-              className="p-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 flex items-center gap-2 font-medium text-slate-800 text-left"
-            >
-              <ShieldCheck className="w-4 h-4 text-indigo-600 shrink-0" />
-              <span className="truncate">Security & Logs</span>
-            </button>
-
-            <button
-              onClick={() => navigateTo('settings')}
-              className="p-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 flex items-center gap-2 font-medium text-slate-800 text-left"
-            >
-              <Settings className="w-4 h-4 text-slate-600 shrink-0" />
-              <span className="truncate">Settings & Cache</span>
-            </button>
-
-            <button
               onClick={() => navigateTo('help')}
-              className="p-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 flex items-center gap-2 font-medium text-slate-800 text-left"
+              className="p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center gap-2 font-medium text-slate-800 dark:text-slate-200 text-left cursor-pointer"
             >
-              <HelpCircle className="w-4 h-4 text-blue-600 shrink-0" />
+              <HelpCircle className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" />
               <span className="truncate">Help & FAQs</span>
             </button>
 
             <button
               onClick={() => navigateTo('legal')}
-              className="col-span-2 p-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 flex items-center gap-2 font-medium text-slate-800 text-left"
+              className="col-span-2 p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center gap-2 font-medium text-slate-800 dark:text-slate-200 text-left cursor-pointer"
             >
-              <Scale className="w-4 h-4 text-blue-600 shrink-0" />
-              <span className="truncate">Privacy Policy & Legal Disclosures (Google Play Ready)</span>
+              <Scale className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" />
+              <span className="truncate">Privacy Policy & Legal</span>
             </button>
           </div>
         </div>

@@ -128,7 +128,7 @@ export const FileItemCard: React.FC<FileItemCardProps> = ({
         </div>
 
         <div className="flex items-center justify-between text-[11px] text-slate-400 dark:text-slate-500">
-          <span className="truncate max-w-[90px]">{fileMeta.label}</span>
+          <span className="truncate max-w-[100px]">{formatShortDate(file.modifiedTimeMillis)}</span>
           <span className="font-mono text-[10px]">
             {file.isFolder ? 'Folder' : humanReadableBytes(file.sizeBytes)}
           </span>

@@ -718,7 +718,7 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
       )}
 
       {/* Main Files View */}
-      <div className={`flex-1 overflow-y-auto ${density === 'compact' ? 'p-2 sm:p-3' : 'p-3 sm:p-4'}`}>
+      <div className={`flex-1 overflow-y-auto pb-28 sm:pb-28 ${density === 'compact' ? 'p-2 sm:p-3' : 'p-3 sm:p-4'}`}>
         {displayedFiles.length === 0 ? (
           <div className="h-64 flex flex-col items-center justify-center text-slate-400 text-center">
             <FileQuestion className="w-12 h-12 text-slate-300 dark:text-slate-600 mb-2" />

@@ -222,7 +222,7 @@ export const FileManagerProvider: React.FC<{ children: ReactNode }> = ({ childre
   // Navigation and UI state
   const [activeAccountId, setActiveAccountId] = useState<LocalAccountId | 'ALL'>('ALL');
   const [activeProvider, setActiveProvider] = useState<ProviderId | 'ALL'>('ALL');
-  const [currentTab, setCurrentTab] = useState<NavigationTab>('dashboard');
+  const [currentTab, setCurrentTab] = useState<NavigationTab>('files');
   const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
   const [folderHistory, setFolderHistory] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
