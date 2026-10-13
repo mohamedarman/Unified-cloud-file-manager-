@@ -34,7 +34,7 @@ object Redactor {
         // FNV-1a: cheap, dependency-free, and adequate for a correlation tag.
         // This is explicitly not a security primitive and must never be used as
         // one - the file id is not a secret, it is simply not for logs.
-        var hash = FNV_OFFSET_BASIS
+        var hash = -0x340d631b7bdddcdbL // 14695981039346656037
         for (char in accountId.toString() + IDENTITY_SEPARATOR + fileId) {
             hash = hash xor char.code.toLong()
             hash *= FNV_PRIME
@@ -68,7 +68,7 @@ object Redactor {
         if (uri.isNullOrEmpty()) return "<null>"
         val schemeEnd = uri.indexOf("://")
         if (schemeEnd < 0) return "<uri>"
-        val authorityStart = schemeEnd + URI_SCHEME_OFFSET
+        val authorityStart = schemeEnd + URI_SCHEME_SEPARATOR_OFFSET
         val pathStart = uri.indexOf('/', authorityStart)
         return if (pathStart < 0) uri else uri.substring(0, pathStart) + "/<redacted>"
     }
@@ -109,12 +109,25 @@ object Redactor {
             Regex("""GOCSPX-[A-Za-z0-9_-]{10,}"""),
         )
 
-    private const val FNV_OFFSET_BASIS = -0x340d631b7bdddcdbL
-    private const val IDENTITY_SEPARATOR = "\u0000"
-    private const val HEX_RADIX = 16
-    private const val TAG_WIDTH = 12
-    private const val FNV_PRIME = 0x100000001b3L
     private const val MAX_UNMASKED_SECRET_LENGTH = 5
     private const val MASKED_SECRET_SUFFIX_LENGTH = 4
-    private const val URI_SCHEME_OFFSET = 3
+    private const val URI_SCHEME_SEPARATOR_OFFSET = 3
+
+    /**
+     * The separator between account id and file id in the hashed input.
+     *
+     * A NUL cannot occur in either component, so it keeps `("4", "2abc")` and
+     * `("42", "abc")` distinct - without it those two hash alike, and two
+     * different files in two different accounts would share a log tag.
+     */
+    private const val IDENTITY_SEPARATOR = "\u0000"
+
+    /** Radix 16. A tag is a correlation handle, not a number anyone does maths on. */
+    private const val HEX_RADIX = 16
+
+    /** 12 hex characters: ample for correlation, and short enough not to be an identifier. */
+    private const val TAG_WIDTH = 12
+
+    /** FNV-1a prime constant */
+    private const val FNV_PRIME = 0x100000001b3L
 }
