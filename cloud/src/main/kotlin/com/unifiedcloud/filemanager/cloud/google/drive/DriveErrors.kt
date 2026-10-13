@@ -288,10 +288,22 @@ object DriveErrors {
      * worse than returning it verbatim.
      */
     fun reasonOf(body: String?): String? {
-        if (body.isNullOrEmpty()) return null
-        val start = quotedValueStart(body, REASON_FIELD) ?: return null
-        val end = body.indexOf('"', start)
-        return if (end < 0) null else body.substring(start, end)
+        if (body.isNullOrBlank()) return null
+        val reasonField = "\"reason\""
+        val reasonIndex = body.indexOf(reasonField)
+        if (reasonIndex < 0) return null
+        
+        val colonIndex = body.indexOf(":", reasonIndex + reasonField.length)
+        if (colonIndex < 0) return null
+        
+        val quoteStart = body.indexOf("\"", colonIndex)
+        if (quoteStart < 0) return null
+        
+        val quoteEnd = body.indexOf("\"", quoteStart + 1)
+        // If there's no closing quote, it's hostile input.
+        if (quoteEnd < 0) return null
+        
+        return body.substring(quoteStart + 1, quoteEnd)
     }
 
     /**

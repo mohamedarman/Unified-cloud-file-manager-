@@ -182,43 +182,46 @@ object AccountStateMachine {
         event: AccountEvent,
     ): AccountState? =
         when (from) {
-            AccountState.DISCONNECTED ->
-                when (event) {
-                    is AccountEvent.AddAccountRequested -> AccountState.AUTHORIZING
-                    else -> null
-                }
+            AccountState.DISCONNECTED -> edgeForDisconnected(event)
+            AccountState.AUTHORIZING -> edgeForAuthorizing(event)
+            AccountState.CONNECTED -> edgeForConnected(event)
+            AccountState.REFRESHING -> edgeForRefreshing(event)
+            AccountState.REAUTH_REQUIRED -> edgeForReauthRequired(event)
+        }
 
-            AccountState.AUTHORIZING ->
-                when (event) {
-                    is AccountEvent.ConsentAbandoned -> AccountState.DISCONNECTED
-                    is AccountEvent.TokensStored -> AccountState.CONNECTED
-                    else -> null
-                }
+    private fun edgeForDisconnected(event: AccountEvent): AccountState? =
+        when (event) {
+            is AccountEvent.AddAccountRequested -> AccountState.AUTHORIZING
+            else -> null
+        }
 
-            AccountState.CONNECTED ->
-                when (event) {
-                    is AccountEvent.AccessTokenExpired -> AccountState.REFRESHING
-                    is AccountEvent.ProviderRejectedCredential -> AccountState.REAUTH_REQUIRED
-                    is AccountEvent.DisconnectRequested -> AccountState.DISCONNECTED
-                    else -> null
-                }
+    private fun edgeForAuthorizing(event: AccountEvent): AccountState? =
+        when (event) {
+            is AccountEvent.ConsentAbandoned -> AccountState.DISCONNECTED
+            is AccountEvent.TokensStored -> AccountState.CONNECTED
+            else -> null
+        }
 
-            AccountState.REFRESHING ->
-                when (event) {
-                    is AccountEvent.RefreshSucceeded -> AccountState.CONNECTED
-                    is AccountEvent.RefreshRejected -> AccountState.REAUTH_REQUIRED
-                    else -> null
-                }
+    private fun edgeForConnected(event: AccountEvent): AccountState? =
+        when (event) {
+            is AccountEvent.AccessTokenExpired -> AccountState.REFRESHING
+            is AccountEvent.ProviderRejectedCredential -> AccountState.REAUTH_REQUIRED
+            is AccountEvent.DisconnectRequested -> AccountState.DISCONNECTED
+            else -> null
+        }
 
-            // SM-2: only the user's own action moves the account out. Every other
-            // event is refused, which is what "terminal until the user acts" means
-            // when it is enforced rather than described.
-            AccountState.REAUTH_REQUIRED ->
-                when (event) {
-                    is AccountEvent.ReconnectRequested -> AccountState.AUTHORIZING
-                    is AccountEvent.DisconnectRequested -> AccountState.DISCONNECTED
-                    else -> null
-                }
+    private fun edgeForRefreshing(event: AccountEvent): AccountState? =
+        when (event) {
+            is AccountEvent.RefreshSucceeded -> AccountState.CONNECTED
+            is AccountEvent.RefreshRejected -> AccountState.REAUTH_REQUIRED
+            else -> null
+        }
+
+    private fun edgeForReauthRequired(event: AccountEvent): AccountState? =
+        when (event) {
+            is AccountEvent.ReconnectRequested -> AccountState.AUTHORIZING
+            is AccountEvent.DisconnectRequested -> AccountState.DISCONNECTED
+            else -> null
         }
 
     /**

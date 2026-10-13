@@ -37,7 +37,7 @@ object Redactor {
         var hash = -0x340d631b7bdddcdbL // 14695981039346656037
         for (char in accountId.toString() + IDENTITY_SEPARATOR + fileId) {
             hash = hash xor char.code.toLong()
-            hash *= 0x100000001b3L
+            hash *= FNV_PRIME
         }
         return hash.toString(HEX_RADIX).takeLast(TAG_WIDTH).padStart(TAG_WIDTH, '0')
     }
@@ -123,4 +123,7 @@ object Redactor {
 
     /** 12 hex characters: ample for correlation, and short enough not to be an identifier. */
     private const val TAG_WIDTH = 12
+
+    /** FNV-1a prime constant */
+    private const val FNV_PRIME = 0x100000001b3L
 }

@@ -97,7 +97,7 @@ class QuotaGovernorTest {
 
     @Test
     fun `the global cap holds across accounts`() {
-        val governor = governor(perAccount = 4, global = 3)
+        val governor = governor(perAccount = 3, global = 4)
 
         assertEquals(Admission.Granted, governor.tryAcquire(alice))
         assertEquals(Admission.Granted, governor.tryAcquire(alice))
