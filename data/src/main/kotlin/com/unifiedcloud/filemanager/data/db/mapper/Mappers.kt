@@ -24,16 +24,6 @@ import com.unifiedcloud.filemanager.domain.model.ProviderId
  * is not the place for an exception to escape into a coroutine.
  */
 
-/**
- * Sync state of a cached row.
- *
- * Distinct from the domain's [Freshness]: this is the row's own bookkeeping, and
- * it records states a reader never sees ([SYNCING], [FAILED]) as well as the two
- * the UI cares about. Collapsing them would mean a failed row looked merely
- * stale, and would be re-fetched forever without anything surfacing the failure.
- */
-
-
 /** The UI-facing freshness implied by a row's sync state. */
 fun FileSyncState.toFreshness(): Freshness =
     when (this) {
@@ -109,9 +99,6 @@ fun CloudFile.toEntity(
     syncState: FileSyncState,
 ): FileMetadataEntity =
     FileMetadataEntity(
-        // localId is deliberately 0: this is an insert-or-update by natural key.
-        // Carrying the old surrogate across would be wrong, since upsert resolves on
-        // (accountId, fileId).
         localId = 0,
         accountId = accountId.value,
         fileId = ref.fileId.value,

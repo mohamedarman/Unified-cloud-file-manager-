@@ -1,0 +1,18 @@
+{
+  "name": "Unified Cloud File Manager Dev Environment",
+  "image": "mcr.microsoft.com/devcontainers/java:17-bullseye",
+  "features": {
+    "ghcr.io/devcontainers/features/android-sdk:1": {
+      "version": "latest"
+    }
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "fwcd.kotlin",
+        "vscjava.vscode-java-pack",
+        "mathiasfrohlich.Kotlin"
+      ]
+    }
+  }
+}

@@ -53,8 +53,8 @@ object Redactor {
         when {
             secret == null -> "<null>"
             secret.isEmpty() -> "<empty>"
-            secret.length <= 5 -> "<redacted>"
-            else -> "<redacted:${secret.takeLast(4)}>"
+            secret.length <= MAX_FULLY_REDACTED_SECRET_LENGTH -> "<redacted>"
+            else -> "<redacted:${secret.takeLast(MASKED_SECRET_SUFFIX_LENGTH)}>"
         }
 
     /**
@@ -68,7 +68,7 @@ object Redactor {
         if (uri.isNullOrEmpty()) return "<null>"
         val schemeEnd = uri.indexOf("://")
         if (schemeEnd < 0) return "<uri>"
-        val authorityStart = schemeEnd + 3
+        val authorityStart = schemeEnd + SCHEME_DELIMITER_LENGTH
         val pathStart = uri.indexOf('/', authorityStart)
         return if (pathStart < 0) uri else uri.substring(0, pathStart) + "/<redacted>"
     }
@@ -108,6 +108,10 @@ object Redactor {
             Regex("""1//[A-Za-z0-9._-]{20,}"""),
             Regex("""GOCSPX-[A-Za-z0-9_-]{10,}"""),
         )
+
+    private const val MAX_FULLY_REDACTED_SECRET_LENGTH = 5
+    private const val MASKED_SECRET_SUFFIX_LENGTH = 4
+    private const val SCHEME_DELIMITER_LENGTH = 3
 
     /**
      * The separator between account id and file id in the hashed input.

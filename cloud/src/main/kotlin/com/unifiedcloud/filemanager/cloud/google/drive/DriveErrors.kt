@@ -47,48 +47,30 @@ object DriveErrors {
     private const val HTTP_SERVER_ERROR_FLOOR = 500
     private const val HTTP_SERVER_ERROR_CEILING = 599
 
-    /**
-     * `403`, reason `insufficientPermissions`. Drive returns this for two
-     * genuinely different problems (see [map] and [DriveOperationContext]).
-     */
-    const val REASON_INSUFFICIENT_PERMISSIONS = "insufficientPermissions"
-
-    /** `403`, reason `userRateLimitExceeded`. A rate limit wearing a `403`. */
+    /** `403 userRateLimitExceeded` - see `Architecture.md` §11.1.3. */
     const val REASON_USER_RATE_LIMIT_EXCEEDED = "userRateLimitExceeded"
 
-    /** `403`, reason `insufficientStorage`. The account's own Drive is full. */
+    /** `403 insufficientStorage` - see `Architecture.md` §12.4. */
     const val REASON_INSUFFICIENT_STORAGE = "insufficientStorage"
 
+    /** `403 insufficientPermissions` - see `Architecture.md` §11.1.3. */
+    const val REASON_INSUFFICIENT_PERMISSIONS = "insufficientPermissions"
+
     /**
-     * Fallback delay when a rate limit arrives with no usable `Retry-After`.
-     *
-     * [AppError.RateLimited] carries a non-null delay, so *some* value is needed
-     * when the header is missing. This one is **ours**, not Google's: it is a
-     * courtesy pause before re-asking, and it is deliberately small so that a
-     * missing header costs latency rather than a user staring at a spinner. It
-     * is not a quota figure and must never be presented as one - the real quota
-     * is unmeasured (V-06, Q-05) and `Rules.md` QD-1 forbids inventing it.
+     * Fallback backoff when `429` / `userRateLimitExceeded` supplies no
+     * `Retry-After` header. Small and courtesy-grade (`Rules.md` RT-4).
      */
-    const val DEFAULT_RETRY_AFTER_MILLIS = 1_000L
-
-    /** Longest `Retry-After` we will believe, so a hostile value cannot hang a worker. */
-    const val MAX_RETRY_AFTER_MILLIS = 60_000L
+    const val DEFAULT_RETRY_AFTER_MILLIS = 2_000L
 
     /**
-     * What the caller knows about the operation that failed.
-     *
-     * [grantedScopesSuffice] is the crux of the `403` ambiguity, and it is an
-     * **input rather than something this file can derive**. Drive reports
-     * "insufficient permissions" identically whether the file is unshared with
-     * the account or the app's grant is too narrow to attempt the operation at
-     * all. Only the auth client knows which, because only it has read the real
-     * scope grant.
-     *
-     * The scope *strings* are deliberately absent. `Memory.md` D-1.5 records the
-     * exact scope string as UNKNOWN and defers it to Phase 0; hard-coding a
-     * remembered scope string here is precisely the failure TK-5 and
-     * `Architecture.md` §33.5.6 exist to prevent. The auth layer compares the
-     * real grant against the operation's requirement and passes a verdict.
+     * Maximum backoff allowed from a provider header. Caps absurd values so a
+     * single bad response cannot park a worker for days.
+     */
+    const val MAX_RETRY_AFTER_MILLIS = 300_000L // 5 minutes
+
+    /**
+     * Context passed into [map] to supply the domain fields the failure itself
+     * does not carry.
      */
     data class DriveOperationContext(
         val accountId: LocalAccountId,
@@ -97,11 +79,7 @@ object DriveErrors {
     )
 
     /**
-     * A Drive failure, reduced to the parts that decide the outcome.
-     *
-     * Assembling this is the HTTP layer's job, which is why [reasonOf] and
-     * [retryAfterMillisOf] are separated from [map]: the transport knows how to
-     * read a body, and this file knows what a reason means.
+     * The raw HTTP details captured at the OkHttp interceptor boundary.
      */
     data class DriveHttpFailure(
         val httpStatus: Int,
@@ -110,57 +88,29 @@ object DriveErrors {
     )
 
     /**
-     * Maps a Drive HTTP failure onto exactly one [AppError].
+     * Maps an HTTP failure to a domain [AppError].
      *
-     * The `403` branch is the one that matters. `insufficientPermissions` on its
-     * own does not say *whose* permission is missing, so:
-     *
-     *  - the grant does **not** cover this operation -> [PermissionReason.SCOPE_INSUFFICIENT].
-     *    Re-authorising may help, but only by requesting more scope, and that is
-     *    a deliberate product decision (D-1.6), not something the UI may assume.
-     *  - the grant **does** cover it -> [PermissionReason.FILE_NOT_SHARED]. The
-     *    account is authorised; this one file simply is not shared with it.
-     *    Retrying cannot help and re-authorising definitely will not.
-     *
-     * `Rules.md` RT-6 makes both terminal, so the distinction is about telling
-     * the user something true, not about what happens next.
-     *
-     * **An unrecognised reason is never guessed at.** A bare `403` with no
-     * parseable body maps to [AppError.Unknown] rather than to a permission or a
-     * rate limit. The cost is that a genuine permission denial occasionally
-     * renders as a generic error with a reference code. That is the cheaper
-     * mistake: the documented failure mode of guessing wrong is
-     * "destroy user trust" by telling someone to wait for a request that will
-     * never succeed, and [AppError.Unknown] is never retried
-     * (`Architecture.md` §21.3), so it cannot become a retry storm either.
+     * Never returns null, never throws, and never returns a success type.
      */
     fun map(
         failure: DriveHttpFailure,
         context: DriveOperationContext,
     ): AppError =
         when (failure.httpStatus) {
-            HTTP_UNAUTHORIZED -> authenticationFailed(failure)
+            HTTP_UNAUTHORIZED -> unauthorized(failure)
             HTTP_FORBIDDEN -> forbidden(failure, context)
             HTTP_NOT_FOUND -> notFound(context)
             HTTP_TOO_MANY_REQUESTS -> rateLimited(failure)
             in HTTP_SERVER_ERROR_FLOOR..HTTP_SERVER_ERROR_CEILING ->
-                AppError.ProviderUnavailable(
-                    ProviderId.GOOGLE_DRIVE,
-                )
-            else -> AppError.Unknown("Drive returned HTTP ${failure.httpStatus}", null)
+                AppError.ProviderUnavailable(ProviderId.GOOGLE_DRIVE)
+            else -> AppError.Unknown("Unclassified HTTP status ${failure.httpStatus}", null)
         }
 
     /**
-     * `401`. The token was rejected.
-     *
-     * Declared retryable with [Recovery.RETRY_TRANSPARENTLY] because `Rules.md`
-     * RT-5 permits exactly one refresh before the account becomes
-     * `AuthorizationRequired`. **The once-per-operation budget is not implemented
-     * here** - it belongs to the operation, because TK-6 and SM-1 scope it to a
-     * single operation and only the operation knows its own extent. The second
-     * failure surfaces as re-authorisation.
+     * `401`. Google access tokens expire after one hour; a 401 means the token
+     * is dead and must be refreshed (`Architecture.md` §7.3).
      */
-    private fun authenticationFailed(failure: DriveHttpFailure): AppError =
+    private fun unauthorized(failure: DriveHttpFailure): AppError =
         AppError.TokenRefreshFailed(
             providerId = ProviderId.GOOGLE_DRIVE,
             errorCode = failure.reason,
@@ -277,59 +227,31 @@ object DriveErrors {
      * Returns null for a null or empty body, a body with no `reason`, a
      * truncated body, or a body that is not JSON at all. Null is the honest
      * answer and the caller maps it conservatively.
-     *
-     * Google nests reasons as `error.errors[].reason`; the first `"reason"`
-     * pair in the document is the one that describes the failure.
-     *
-     * Values are returned **as they appear**, with no unescaping. Drive's reason
-     * codes are plain identifiers, so the two forms are identical for every
-     * reason that matters here; a body carrying `\"` would be malformed as far as
-     * this mapper is concerned, and returning a half-unescaped string would be
-     * worse than returning it verbatim.
      */
-    fun reasonOf(body: String?): String? {
-        if (body.isNullOrBlank()) return null
-        val reasonField = "\"reason\""
-        val reasonIndex = body.indexOf(reasonField)
-        if (reasonIndex < 0) return null
-        
-        val colonIndex = body.indexOf(":", reasonIndex + reasonField.length)
-        if (colonIndex < 0) return null
-        
-        val quoteStart = body.indexOf("\"", colonIndex)
-        if (quoteStart < 0) return null
-        
-        val quoteEnd = body.indexOf("\"", quoteStart + 1)
-        // If there's no closing quote, it's hostile input.
-        if (quoteEnd < 0) return null
-        
-        return body.substring(quoteStart + 1, quoteEnd)
+    fun reasonOf(body: String?): String? =
+        body
+            ?.let(::stringValueAfterReasonKey)
+            ?.takeIf { value -> value.isNotEmpty() && value.all(::isReasonChar) }
+
+    private fun isReasonChar(c: Char): Boolean =
+        c.isLetterOrDigit() || c == '_' || c == '-'
+
+    private fun skipWhitespace(text: String, from: Int): Int {
+        var i = from
+        while (i < text.length && text[i].isWhitespace()) i++
+        return i
     }
 
-    /**
-     * Index of the first character *inside* the quoted value of [field], or null
-     * when the field is absent, is not a field, or its value is not a string.
-     *
-     * Split out purely to keep both functions under the project's
-     * `ReturnCount` ceiling: a single linear scan with six exits is harder to
-     * read than a scan with two.
-     */
-    private fun quotedValueStart(
-        body: String,
-        field: String,
-    ): Int? {
-        val key = body.indexOf(field)
-        if (key < 0) return null
-
-        var index = key + field.length
-        // Skip whitespace, then require the ':' that makes this a field rather
-        // than a substring of some larger value.
-        while (index < body.length && body[index].isWhitespace()) index++
-        if (index >= body.length || body[index] != ':') return null
-
-        index++
-        while (index < body.length && body[index].isWhitespace()) index++
-        return if (index < body.length && body[index] == '"') index + 1 else null
+    private fun stringValueAfterReasonKey(body: String): String? {
+        val keyAt = body.indexOf(REASON_KEY)
+        if (keyAt < 0) return null
+        val colon = skipWhitespace(body, keyAt + REASON_KEY.length)
+        if (colon >= body.length || body[colon] != ':') return null
+        val quote = skipWhitespace(body, colon + 1)
+        if (quote >= body.length || body[quote] != '"') return null
+        val endQuote = body.indexOf('"', quote + 1)
+        if (endQuote < 0) return null
+        return body.substring(quote + 1, endQuote)
     }
 
     /**
@@ -357,7 +279,7 @@ object DriveErrors {
         return seconds.coerceAtMost(MAX_RETRY_AFTER_SECONDS) * MILLIS_PER_SECOND
     }
 
-    private const val REASON_FIELD = "\"reason\""
+    private const val REASON_KEY = "\"reason\""
     private const val MILLIS_PER_SECOND = 1_000L
     private const val MAX_RETRY_AFTER_SECONDS = MAX_RETRY_AFTER_MILLIS / MILLIS_PER_SECOND
 }
