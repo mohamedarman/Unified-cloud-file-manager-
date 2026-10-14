@@ -21,6 +21,23 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
+      - name: Cache Gradle packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+      - name: Cache Build outputs
+        uses: actions/cache@v4
+        with:
+          path: |
+            **/build
+          key: ${{ runner.os }}-build-policy-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties', '**/*.kt') }}
+          restore-keys: |
+            ${{ runner.os }}-build-policy-
       - uses: gradle/actions/setup-gradle@v3
       - name: Make gradlew executable
         run: chmod +x ./gradlew
@@ -45,6 +62,23 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
+      - name: Cache Gradle packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+      - name: Cache Build outputs
+        uses: actions/cache@v4
+        with:
+          path: |
+            **/build
+          key: ${{ runner.os }}-build-unit-test-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties', '**/*.kt') }}
+          restore-keys: |
+            ${{ runner.os }}-build-unit-test-
       - uses: gradle/actions/setup-gradle@v3
       - name: Make gradlew executable
         run: chmod +x ./gradlew
@@ -71,13 +105,30 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
+      - name: Cache Gradle packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+      - name: Cache Build outputs
+        uses: actions/cache@v4
+        with:
+          path: |
+            **/build
+          key: ${{ runner.os }}-build-migration-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties', '**/*.kt') }}
+          restore-keys: |
+            ${{ runner.os }}-build-migration-
       - name: Accept Android SDK licenses
         run: |
           mkdir -p "$ANDROID_HOME/licenses"
           printf "24333f8a63cbd82ea14e1861ee225939c7f20e57\n893fb8a22d82224b8478fb7fa5148fdb92fd55e6\nd56f5187479451eabf01fb78af6dfcb131a6481e\n" > "$ANDROID_HOME/licenses/android-sdk-license"
           printf "84831b9409646a918e30573bab4c9c91346d8abd\n" > "$ANDROID_HOME/licenses/android-sdk-preview-license"
           printf "601085b00ccd4a54464587335ab260c3e10290bf\n" > "$ANDROID_HOME/licenses/android-googletv-license"
-          printf "859f317696f67ef3d7f30a50a5560e7834b43903\n" > "$ANDROID_HOME/licenses/android-sdk-arm-dbt-license"
+          printf "859f317696f67ef3d7f30a50a5560e7834b43903\n" > "$ANDROID_HOME/licenses/google-gdk-license"
           printf "33b6a2b64707f15b6fadd8c374170d9949e7e0d2\n" > "$ANDROID_HOME/licenses/google-gdk-license"
           printf "d975f751698a77b662f1254ddbeed3901e976f5a\n" > "$ANDROID_HOME/licenses/intel-android-extra-license"
           printf "e9acab5b5fbb560a72cfa4e23e338b00a0815979\n" > "$ANDROID_HOME/licenses/mips-android-sysimage-license"
@@ -119,6 +170,23 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
+      - name: Cache Gradle packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+      - name: Cache Build outputs
+        uses: actions/cache@v4
+        with:
+          path: |
+            **/build
+          key: ${{ runner.os }}-build-instrumented-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties', '**/*.kt') }}
+          restore-keys: |
+            ${{ runner.os }}-build-instrumented-
       - name: Accept Android SDK licenses
         run: |
           mkdir -p "$ANDROID_HOME/licenses"
