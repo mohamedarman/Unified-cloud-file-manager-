@@ -225,12 +225,13 @@ class QuotaGovernorTest {
     // --- withPermit ---------------------------------------------------------
 
     @Test
-    fun `withPermit returns the block's value and releases afterwards`() = runTest {
-        val governor = governor(perAccount = 1, global = 1)
-        val result = governor.withPermit(alice) { "listed" }
-        assertEquals("listed", result)
-        assertEquals(0, governor.inFlightTotal())
-    }
+    fun `withPermit returns the block's value and releases afterwards`() =
+        runTest {
+            val governor = governor(perAccount = 1, global = 1)
+            val result = governor.withPermit(alice) { "listed" }
+            assertEquals("listed", result)
+            assertEquals(0, governor.inFlightTotal())
+        }
 
     @Test
     fun `withPermit releases when the block throws`() {
@@ -249,14 +250,15 @@ class QuotaGovernorTest {
     }
 
     @Test
-    fun `withPermit does not run the block when admission is refused`() = runTest {
-        val governor = governor(perAccount = 1, global = 1)
-        var ran = false
-        governor.tryAcquire(alice)
-        val result = governor.withPermit(alice) { ran = true }
-        assertNull(result)
-        assertFalse("a refused permit must not run the block", ran)
-    }
+    fun `withPermit does not run the block when admission is refused`() =
+        runTest {
+            val governor = governor(perAccount = 1, global = 1)
+            var ran = false
+            governor.tryAcquire(alice)
+            val result = governor.withPermit(alice) { ran = true }
+            assertNull(result)
+            assertFalse("a refused permit must not run the block", ran)
+        }
 
     // --- concurrency --------------------------------------------------------
 
