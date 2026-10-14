@@ -47,7 +47,7 @@ espresso = "3.6.1"
 
 # Quality gates. Architecture.md §27.2 requires all of these.
 detekt = "1.23.7"
-ktlintPlugin = "12.1.1"
+ktlintPlugin = "14.2.0"
 
 [libraries]
 # --- Kotlin ---
