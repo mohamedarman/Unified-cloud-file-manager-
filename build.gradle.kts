@@ -17,17 +17,40 @@ plugins {
 }
 
 // ---------------------------------------------------------------------------
+// Align Kotlinx serialization across the full dependency graph. Room/KSP can
+// generate serializer code against a different runtime API than a transitive
+// dependency injects, which triggers the `AbstractMethodError` seen in
+// `:data:kspDebugKotlin`.
+//
+// The project already pins Kotlin 2.0.21 and kotlinx-serialization 1.7.3 in the
+// version catalog; this forces every module and transitive dependency to use the
+// same runtime so generated `$$serializer` classes and the runtime match.
+// ---------------------------------------------------------------------------
+subprojects {
+    configurations.configureEach {
+        resolutionStrategy.eachDependency { details ->
+            val group = details.requested.group
+            val name = details.requested.name
+            if (group == "org.jetbrains.kotlinx" && name.startsWith("kotlinx-serialization")) {
+                details.useVersion(libs.versions.serialization.get())
+                details.because(
+                    "Align kotlinx.serialization runtime with KSP/Kotlin compiler and Room-generated serializers."
+                )
+            }
+        }
+    }
+
+    plugins.withId("org.jetbrains.kotlin.jvm") { configureKotlinQuality(isAndroid = false) }
+    plugins.withId("org.jetbrains.kotlin.android") { configureKotlinQuality(isAndroid = true) }
+}
+
+// ---------------------------------------------------------------------------
 // Static analysis is applied to every module that compiles Kotlin, rather than
 // repeated in five build files where it could be forgotten in the sixth.
 //
 // Architecture.md §27.2 makes these blocking gates. A gate declared per-module
 // is a gate that eventually does not run.
 // ---------------------------------------------------------------------------
-subprojects {
-    plugins.withId("org.jetbrains.kotlin.jvm") { configureKotlinQuality(isAndroid = false) }
-    plugins.withId("org.jetbrains.kotlin.android") { configureKotlinQuality(isAndroid = true) }
-}
-
 fun Project.configureKotlinQuality(isAndroid: Boolean) {
     pluginManager.apply(libs.plugins.detekt.get().pluginId)
     pluginManager.apply(libs.plugins.ktlint.get().pluginId)
