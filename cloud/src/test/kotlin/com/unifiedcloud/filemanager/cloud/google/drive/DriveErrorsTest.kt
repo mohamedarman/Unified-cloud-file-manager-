@@ -358,7 +358,10 @@ class DriveErrorsTest {
                 "<html><body>403 Forbidden</body></html>",
                 """{"error":{"code":403,"message":"nope"}}""",
                 """{"error":{"errors":[{"reason":"unterminated}]}}""",
-                """{"error":{"errors":[{"reason":"noColonAfterKey"}}""",
+                """{"error":{"errors":[{"reason" "noColonAfterKey"}}""",
+                """{"reason": 123, "message": "abc"}""",
+                """{"reason": true, "message": "abc"}""",
+                """{"reason": [1, 2, 3]}""",
                 """reason""",
                 "\u0000",
             )

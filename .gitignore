@@ -51,3 +51,7 @@ spike-*/
 
 # Logs
 *.log
+
+# Artifacts & Archives
+.aistudio/
+*.zip
