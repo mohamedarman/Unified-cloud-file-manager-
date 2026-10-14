@@ -233,10 +233,12 @@ object DriveErrors {
             ?.let(::stringValueAfterReasonKey)
             ?.takeIf { value -> value.isNotEmpty() && value.all(::isReasonChar) }
 
-    private fun isReasonChar(c: Char): Boolean =
-        c.isLetterOrDigit() || c == '_' || c == '-'
+    private fun isReasonChar(c: Char): Boolean = c.isLetterOrDigit() || c == '_' || c == '-'
 
-    private fun skipWhitespace(text: String, from: Int): Int {
+    private fun skipWhitespace(
+        text: String,
+        from: Int,
+    ): Int {
         var i = from
         while (i < text.length && text[i].isWhitespace()) i++
         return i

@@ -283,7 +283,7 @@ class AccountStateMachineTest {
                 refused(
                     state,
                     event,
-                    if (event is AccountEvent.TokensStored) {
+                    if (event is AccountEvent.TokensStored && !event.verifiedByLiveCall) {
                         TransitionRefusal.LIVE_VERIFICATION_REQUIRED
                     } else {
                         TransitionRefusal.NOT_PERMITTED_FROM_STATE
