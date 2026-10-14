@@ -242,24 +242,19 @@ object DriveErrors {
         return i
     }
 
-    private fun stringValueAfterReasonKey(body: String): String? {
+    private fun reasonValueQuoteStart(body: String): Int? {
         val keyAt = body.indexOf(REASON_KEY)
-        var result: String? = null
+        if (keyAt < 0) return null
+        val colon = skipWhitespace(body, keyAt + REASON_KEY.length)
+        if (colon >= body.length || body[colon] != ':') return null
+        val quote = skipWhitespace(body, colon + 1)
+        return if (quote < body.length && body[quote] == '"') quote else null
+    }
 
-        if (keyAt >= 0) {
-            val colon = skipWhitespace(body, keyAt + REASON_KEY.length)
-            if (colon < body.length && body[colon] == ':') {
-                val quote = skipWhitespace(body, colon + 1)
-                if (quote < body.length && body[quote] == '"') {
-                    val endQuote = body.indexOf('"', quote + 1)
-                    if (endQuote >= 0) {
-                        result = body.substring(quote + 1, endQuote)
-                    }
-                }
-            }
-        }
-
-        return result
+    private fun stringValueAfterReasonKey(body: String): String? {
+        val quote = reasonValueQuoteStart(body) ?: return null
+        val endQuote = body.indexOf('"', quote + 1)
+        return if (endQuote >= 0) body.substring(quote + 1, endQuote) else null
     }
 
     /**
