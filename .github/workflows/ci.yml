@@ -19,6 +19,7 @@ env:
   GRADLE_OPTS: -Dorg.gradle.jvmargs=-Xmx3g -Dfile.encoding=UTF-8
   ANDROID_HOME: /usr/local/lib/android/sdk
   ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   # -------------------------------------------------------------------------
@@ -30,10 +31,10 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4.2.2
 
       - name: Cache Gradle packages
-        uses: actions/cache@v4
+        uses: actions/cache@v4.2.0
         with:
           path: |
             ~/.gradle/caches
@@ -43,11 +44,15 @@ jobs:
             ${{ runner.os }}-gradle-
 
       - name: Set up JDK 17
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@v5.0.0
         with:
           distribution: temurin
           java-version: '17'
 
+      # Required even here. Gradle configures every project by default, so the
+      # Android modules are configured - and AGP fails at CONFIGURATION time
+      # without an SDK, long before any of these gates run. Without this step
+      # this job would fail for a reason unrelated to what it checks.
       - name: Accept Android SDK licenses
         run: |
           mkdir -p "$ANDROID_HOME/licenses"
@@ -60,14 +65,14 @@ jobs:
           printf "e9acab5b5fbb560a72cfa4e23e338b00a0815979\n" > "$ANDROID_HOME/licenses/mips-android-sysimage-license"
 
       - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+        uses: android-actions/setup-android@v3.2.1
         with:
           cmdline-tools-version: '11076708'
           accept-android-sdk-licenses: true
           packages: 'platform-tools platforms;android-35 build-tools;35.0.0'
 
       - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v3
+        uses: gradle/actions/setup-gradle@v4.3.0
 
       - name: Make gradlew executable
         run: chmod +x ./gradlew
@@ -103,7 +108,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4.2.2
 
       - name: Set up Bun
         uses: oven-sh/setup-bun@v2
@@ -118,7 +123,7 @@ jobs:
           cp -r dist/* app/src/main/assets/
 
       - name: Cache Gradle packages and build outputs
-        uses: actions/cache@v4
+        uses: actions/cache@v4.2.0
         with:
           path: |
             ~/.gradle/caches
@@ -129,7 +134,7 @@ jobs:
             ${{ runner.os }}-gradle-build-
 
       - name: Set up JDK 17
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@v5.0.0
         with:
           distribution: temurin
           java-version: '17'
@@ -146,13 +151,13 @@ jobs:
           printf "e9acab5b5fbb560a72cfa4e23e338b00a0815979\n" > "$ANDROID_HOME/licenses/mips-android-sysimage-license"
 
       - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+        uses: android-actions/setup-android@v3.2.1
         with:
           cmdline-tools-version: '11076708'
           accept-android-sdk-licenses: true
           packages: 'platform-tools platforms;android-35 build-tools;35.0.0'
 
-      - uses: gradle/actions/setup-gradle@v3
+      - uses: gradle/actions/setup-gradle@v4.3.0
 
       - name: Make gradlew executable
         run: chmod +x ./gradlew
@@ -171,7 +176,7 @@ jobs:
 
       - name: Upload lint report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v4.6.0
         with:
           name: lint-report
           path: app/build/reports/lint-results-debug.html
@@ -179,7 +184,7 @@ jobs:
 
       - name: Upload detekt report
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v4.6.0
         with:
           name: detekt-report
           path: '**/build/reports/detekt/**'
@@ -195,10 +200,10 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4.2.2
 
       - name: Cache Gradle packages
-        uses: actions/cache@v4
+        uses: actions/cache@v4.2.0
         with:
           path: |
             ~/.gradle/caches
@@ -207,7 +212,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-gradle-unit-
 
-      - uses: actions/setup-java@v5
+      - uses: actions/setup-java@v5.0.0
         with:
           distribution: temurin
           java-version: '17'
@@ -224,13 +229,13 @@ jobs:
           printf "e9acab5b5fbb560a72cfa4e23e338b00a0815979\n" > "$ANDROID_HOME/licenses/mips-android-sysimage-license"
 
       - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+        uses: android-actions/setup-android@v3.2.1
         with:
           cmdline-tools-version: '11076708'
           accept-android-sdk-licenses: true
           packages: 'platform-tools platforms;android-35 build-tools;35.0.0'
 
-      - uses: gradle/actions/setup-gradle@v3
+      - uses: gradle/actions/setup-gradle@v4.3.0
 
       - name: Make gradlew executable
         run: chmod +x ./gradlew
@@ -243,7 +248,7 @@ jobs:
 
       - name: Upload test reports
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v4.6.0
         with:
           name: unit-test-reports
           path: '**/build/reports/tests/**/*.html'
@@ -259,10 +264,10 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4.2.2
 
       - name: Cache Gradle packages
-        uses: actions/cache@v4
+        uses: actions/cache@v4.2.0
         with:
           path: |
             ~/.gradle/caches
@@ -271,7 +276,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-gradle-migration-
 
-      - uses: actions/setup-java@v5
+      - uses: actions/setup-java@v5.0.0
         with:
           distribution: temurin
           java-version: '17'
@@ -288,13 +293,13 @@ jobs:
           printf "e9acab5b5fbb560a72cfa4e23e338b00a0815979\n" > "$ANDROID_HOME/licenses/mips-android-sysimage-license"
 
       - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+        uses: android-actions/setup-android@v3.2.1
         with:
           cmdline-tools-version: '11076708'
           accept-android-sdk-licenses: true
           packages: 'platform-tools platforms;android-35 build-tools;35.0.0'
 
-      - uses: gradle/actions/setup-gradle@v3
+      - uses: gradle/actions/setup-gradle@v4.3.0
 
       - name: Make gradlew executable
         run: chmod +x ./gradlew
@@ -343,10 +348,10 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4.2.2
 
       - name: Cache Gradle packages
-        uses: actions/cache@v4
+        uses: actions/cache@v4.2.0
         with:
           path: |
             ~/.gradle/caches
@@ -355,7 +360,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-gradle-inst-
 
-      - uses: actions/setup-java@v5
+      - uses: actions/setup-java@v5.0.0
         with:
           distribution: temurin
           java-version: '17'
@@ -372,13 +377,13 @@ jobs:
           printf "e9acab5b5fbb560a72cfa4e23e338b00a0815979\n" > "$ANDROID_HOME/licenses/mips-android-sysimage-license"
 
       - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+        uses: android-actions/setup-android@v3.2.1
         with:
           cmdline-tools-version: '11076708'
           accept-android-sdk-licenses: true
           packages: 'platform-tools platforms;android-35 build-tools;35.0.0'
 
-      - uses: gradle/actions/setup-gradle@v3
+      - uses: gradle/actions/setup-gradle@v4.3.0
 
       - name: Make gradlew executable
         run: chmod +x ./gradlew
@@ -400,7 +405,7 @@ jobs:
 
       - name: Upload reports
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v4.6.0
         with:
           name: instrumented-reports
           path: '**/build/reports/androidTests/**'
