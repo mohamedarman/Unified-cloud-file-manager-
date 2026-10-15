@@ -35,7 +35,6 @@ enum class FileSyncState {
          * wasteful but correct, rather than trusting a state whose meaning is
          * unknown.
          */
-        fun fromPersisted(value: String?): FileSyncState =
-            values().find { it.name == value } ?: PENDING
+        fun fromPersisted(value: String?): FileSyncState = entries.find { it.name == value } ?: PENDING
     }
 }

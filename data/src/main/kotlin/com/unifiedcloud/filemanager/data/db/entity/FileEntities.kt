@@ -6,7 +6,7 @@ import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
 
-/**
+/*
  * Cached file metadata, sync state, and the two small join tables.
  *
  * A folder is a [FileMetadataEntity] with `isFolder = true` (`Architecture.md`

@@ -10,7 +10,7 @@ import com.unifiedcloud.filemanager.domain.model.LocalAccountId
 import com.unifiedcloud.filemanager.domain.model.ProviderFileId
 import com.unifiedcloud.filemanager.domain.model.ProviderId
 
-/**
+/*
  * Entity ↔ domain mapping.
  *
  * These are the only place the persistence representation and the domain

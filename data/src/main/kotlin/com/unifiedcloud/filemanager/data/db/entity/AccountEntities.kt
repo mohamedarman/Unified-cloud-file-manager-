@@ -6,7 +6,7 @@ import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
 
-/**
+/*
  * Account-scoped persistence entities (Phase 6).
  *
  * ## Why columns are primitives, not domain value classes
