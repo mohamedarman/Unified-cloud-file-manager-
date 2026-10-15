@@ -44,7 +44,7 @@ mockWebServer = "4.12.0"
 androidxTestExtJunit = "1.2.1"
 androidxTestCore = "1.6.1"
 androidxTestRunner = "1.6.2"
-espresso = "3.6.1"
+espresso = "3.7.0"
 
 # Quality gates. Architecture.md §27.2 requires all of these.
 detekt = "1.23.7"
