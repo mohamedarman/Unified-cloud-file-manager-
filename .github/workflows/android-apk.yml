@@ -25,15 +25,17 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4.2.2
 
-      - name: Set up Bun
-        uses: oven-sh/setup-bun@v2
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
         with:
-          bun-version: latest
+          node-version: '22'
+          cache: 'npm'
 
       - name: Install dependencies and build web assets
         run: |
-          bun install --frozen-lockfile
-          bun run build
+          npm ci
+          npm run lint
+          npm run build
           mkdir -p app/src/main/assets
           cp -r dist/* app/src/main/assets/
 

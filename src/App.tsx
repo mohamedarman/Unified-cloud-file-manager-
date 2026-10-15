@@ -13,7 +13,7 @@ import { OperationalFooter } from './components/common/OperationalFooter';
 import { MobileBottomNav } from './components/MobileBottomNav';
 import { DeviceFrameSimulator } from './components/DeviceSimulator/DeviceFrameSimulator';
 import { CookieConsentBanner } from './components/common/CookieConsentBanner';
-import { Wifi, Battery, Signal, Loader2 } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 
 const LoginPage = lazy(() => import('./components/Auth/LoginPage').then((m) => ({ default: m.LoginPage })));
 const TransferDrawer = lazy(() => import('./components/TransferDrawer').then((m) => ({ default: m.TransferDrawer })));

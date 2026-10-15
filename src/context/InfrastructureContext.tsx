@@ -117,8 +117,8 @@ export const InfrastructureProvider: React.FC<{ children: ReactNode }> = ({ chil
 
   // Operations
   const toggleResourcePower = (resourceId: string) => {
-    setResources((prev) =>
-      prev.map((r) => {
+    setResources((prev: CloudResource[]) =>
+      prev.map((r: CloudResource) => {
         if (r.id !== resourceId) return r;
         const willStop = r.status !== 'STOPPED';
         const newStatus = willStop ? 'STOPPED' : 'HEALTHY';
@@ -137,7 +137,7 @@ export const InfrastructureProvider: React.FC<{ children: ReactNode }> = ({ chil
           resourceName: r.name,
           message: `${willStop ? 'Power OFF signal sent' : 'Power ON & health check verified'} for ${r.name}`,
         };
-        setLogs((l) => [newLog, ...l]);
+        setLogs((l: InfrastructureLog[]) => [newLog, ...l]);
 
         toast.success(
           `${r.name} is now ${willStop ? 'Stopped' : 'Starting up...'}`
@@ -159,7 +159,7 @@ export const InfrastructureProvider: React.FC<{ children: ReactNode }> = ({ chil
   };
 
   const rebootResource = (resourceId: string) => {
-    const res = resources.find((r) => r.id === resourceId);
+    const res = resources.find((r: CloudResource) => r.id === resourceId);
     if (!res) return;
 
     toast.info(`Reboot sequence initiated for ${res.name}`);
@@ -174,7 +174,7 @@ export const InfrastructureProvider: React.FC<{ children: ReactNode }> = ({ chil
       resourceName: res.name,
       message: `Warm restart executed for ${res.name}. Health check verified in 4.2s.`,
     };
-    setLogs((l) => [newLog, ...l]);
+    setLogs((l: InfrastructureLog[]) => [newLog, ...l]);
 
     setTimeout(() => {
       toast.success(`${res.name} reboot completed. Health check status: OK.`);
@@ -182,25 +182,25 @@ export const InfrastructureProvider: React.FC<{ children: ReactNode }> = ({ chil
   };
 
   const acknowledgeAlert = (alertId: string) => {
-    setAlerts((prev) =>
-      prev.map((a) => (a.id === alertId ? { ...a, status: 'ACKNOWLEDGED' } : a))
+    setAlerts((prev: InfrastructureAlert[]) =>
+      prev.map((a: InfrastructureAlert) => (a.id === alertId ? { ...a, status: 'ACKNOWLEDGED' } : a))
     );
     toast.success('Alert acknowledged');
   };
 
   const resolveAlert = (alertId: string) => {
-    setAlerts((prev) =>
-      prev.map((a) => (a.id === alertId ? { ...a, status: 'RESOLVED' } : a))
+    setAlerts((prev: InfrastructureAlert[]) =>
+      prev.map((a: InfrastructureAlert) => (a.id === alertId ? { ...a, status: 'RESOLVED' } : a))
     );
     toast.success('Alert marked as resolved');
   };
 
   const applyRecommendation = (recommendationId: string) => {
-    const rec = recommendations.find((r) => r.id === recommendationId);
+    const rec = recommendations.find((r: FinOpsRecommendation) => r.id === recommendationId);
     if (!rec) return;
 
-    setRecommendations((prev) =>
-      prev.map((r) => (r.id === recommendationId ? { ...r, status: 'APPLIED' } : r))
+    setRecommendations((prev: FinOpsRecommendation[]) =>
+      prev.map((r: FinOpsRecommendation) => (r.id === recommendationId ? { ...r, status: 'APPLIED' } : r))
     );
 
     // If it's an idle resource, stop it
@@ -214,14 +214,14 @@ export const InfrastructureProvider: React.FC<{ children: ReactNode }> = ({ chil
   };
 
   const triggerWorkflow = (workflowId: string) => {
-    const wf = workflows.find((w) => w.id === workflowId);
+    const wf = workflows.find((w: AutomationWorkflow) => w.id === workflowId);
     if (!wf) return;
 
     toast.info(`Triggering runbook: "${wf.name}"...`);
 
     setTimeout(() => {
-      setWorkflows((prev) =>
-        prev.map((w) =>
+      setWorkflows((prev: AutomationWorkflow[]) =>
+        prev.map((w: AutomationWorkflow) =>
           w.id === workflowId
             ? {
                 ...w,
@@ -243,7 +243,7 @@ export const InfrastructureProvider: React.FC<{ children: ReactNode }> = ({ chil
         resourceName: wf.name,
         message: `Workflow "${wf.name}" completed execution with code 0.`,
       };
-      setLogs((l) => [newLog, ...l]);
+      setLogs((l: InfrastructureLog[]) => [newLog, ...l]);
 
       toast.success(`Workflow "${wf.name}" finished successfully.`);
     }, 1000);
@@ -270,7 +270,7 @@ export const InfrastructureProvider: React.FC<{ children: ReactNode }> = ({ chil
       connectedSince: new Date().toISOString().split('T')[0],
     };
 
-    setCloudAccounts((prev) => [...prev, newAccount]);
+    setCloudAccounts((prev: CloudProviderAccount[]) => [...prev, newAccount]);
     toast.success(`Connected ${provider} provider account: ${name}`);
   };
 
