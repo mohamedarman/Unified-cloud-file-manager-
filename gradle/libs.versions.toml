@@ -43,6 +43,7 @@ junit = "4.13.2"
 mockWebServer = "4.12.0"
 androidxTestExtJunit = "1.2.1"
 androidxTestCore = "1.6.1"
+androidxTestRunner = "1.6.2"
 espresso = "3.6.1"
 
 # Quality gates. Architecture.md §27.2 requires all of these.
@@ -109,6 +110,7 @@ coil-compose = { module = "io.coil-kt:coil-compose", version.ref = "coil" }
 junit = { module = "junit:junit", version.ref = "junit" }
 androidx-test-ext-junit = { module = "androidx.test.ext:junit", version.ref = "androidxTestExtJunit" }
 androidx-test-core = { module = "androidx.test:core", version.ref = "androidxTestCore" }
+androidx-test-runner = { module = "androidx.test:runner", version.ref = "androidxTestRunner" }
 androidx-espresso-core = { module = "androidx.test.espresso:espresso-core", version.ref = "espresso" }
 
 # --- Quality ---
