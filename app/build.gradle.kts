@@ -61,14 +61,18 @@ kotlin {
     compilerOptions { allWarningsAsErrors.set(true) }
 }
 
+val rootDirPath = layout.projectDirectory.dir("..")
+val assetsFile = layout.projectDirectory.file("src/main/assets/index.html").asFile
+val pkgFile = rootDirPath.file("package.json").asFile
+val isWindows = System.getProperty("os.name").lowercase().contains("windows")
+
 val buildFrontend by tasks.registering(Exec::class) {
-    workingDir = rootProject.projectDir
+    workingDir(rootDirPath)
     onlyIf {
-        !file("src/main/assets/index.html").exists() &&
-            rootProject.file("package.json").exists()
+        !assetsFile.exists() && pkgFile.exists()
     }
     isIgnoreExitValue = true
-    if (System.getProperty("os.name").lowercase().contains("windows")) {
+    if (isWindows) {
         commandLine("cmd", "/c", "npm run build")
     } else {
         commandLine("npm", "run", "build")
@@ -77,10 +81,14 @@ val buildFrontend by tasks.registering(Exec::class) {
 
 val copyFrontendAssets by tasks.registering(Copy::class) {
     dependsOn(buildFrontend)
-    from(rootProject.file("dist"))
-    into(file("src/main/assets"))
+    val distDir = layout.projectDirectory.dir("../dist")
+    val targetDir = layout.projectDirectory.dir("src/main/assets")
+    val distFile = distDir.asFile
+
+    from(distDir)
+    into(targetDir)
     onlyIf {
-        rootProject.file("dist").exists()
+        distFile.exists()
     }
 }
 
@@ -97,6 +105,7 @@ dependencies {
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)
+    implementation(libs.androidx.webkit)
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.lifecycle.runtime)
     implementation(libs.androidx.lifecycle.viewmodel.compose)

@@ -15,6 +15,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.webkit.WebViewAssetLoader
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -33,8 +34,8 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-private const val LOCAL_HOST = "unifiedcloud.local"
-private const val APP_URL = "https://$LOCAL_HOST/index.html"
+private const val ASSET_DOMAIN = "appassets.androidplatform.net"
+private const val APP_URL = "https://$ASSET_DOMAIN/assets/index.html"
 
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
@@ -42,15 +43,18 @@ fun AppWebView() {
     AndroidView(
         modifier = Modifier.fillMaxSize(),
         factory = { context ->
+            val assetLoader =
+                WebViewAssetLoader.Builder()
+                    .setDomain(ASSET_DOMAIN)
+                    .addPathHandler("/assets/", WebViewAssetLoader.AssetsPathHandler(context))
+                    .build()
+
             WebView(context).apply {
                 settings.apply {
                     javaScriptEnabled = true
                     domStorageEnabled = true
-                    databaseEnabled = true
-                    allowFileAccess = true
-                    allowContentAccess = true
-                    allowFileAccessFromFileURLs = true
-                    allowUniversalAccessFromFileURLs = true
+                    allowFileAccess = false
+                    allowContentAccess = false
                     useWideViewPort = true
                     loadWithOverviewMode = true
                     mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
@@ -64,7 +68,7 @@ fun AppWebView() {
                             request: WebResourceRequest?,
                         ): Boolean {
                             val uri = request?.url ?: return false
-                            return uri.host != LOCAL_HOST && uri.scheme != "file"
+                            return uri.host != ASSET_DOMAIN
                         }
 
                         override fun shouldInterceptRequest(
@@ -72,19 +76,7 @@ fun AppWebView() {
                             request: WebResourceRequest?,
                         ): WebResourceResponse? {
                             val uri = request?.url ?: return null
-                            if (uri.host == LOCAL_HOST) {
-                                val rawPath = uri.path?.takeIf { it.isNotEmpty() && it != "/" } ?: "/index.html"
-                                val assetPath = rawPath.removePrefix("/")
-                                val mime = resolveMimeType(assetPath)
-                                return runCatching {
-                                    WebResourceResponse(mime, "UTF-8", context.assets.open(assetPath))
-                                }.getOrElse {
-                                    runCatching {
-                                        WebResourceResponse("text/html", "UTF-8", context.assets.open("index.html"))
-                                    }.getOrNull()
-                                }
-                            }
-                            return super.shouldInterceptRequest(view, request)
+                            return assetLoader.shouldInterceptRequest(uri)
                         }
                     }
 
@@ -94,19 +86,5 @@ fun AppWebView() {
     )
 }
 
-private fun resolveMimeType(path: String): String {
-    return when {
-        path.endsWith(".html") -> "text/html"
-        path.endsWith(".js") || path.endsWith(".mjs") -> "application/javascript"
-        path.endsWith(".css") -> "text/css"
-        path.endsWith(".svg") -> "image/svg+xml"
-        path.endsWith(".png") -> "image/png"
-        path.endsWith(".jpg") || path.endsWith(".jpeg") -> "image/jpeg"
-        path.endsWith(".json") -> "application/json"
-        path.endsWith(".ico") -> "image/x-icon"
-        path.endsWith(".woff2") -> "font/woff2"
-        else -> "application/octet-stream"
-    }
-}
 
 

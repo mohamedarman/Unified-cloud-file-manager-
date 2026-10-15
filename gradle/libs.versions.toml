@@ -23,6 +23,7 @@ workManager = "2.9.1"
 paging = "3.3.2"
 documentfile = "1.0.1"
 security = "1.1.0-alpha06"
+webkit = "1.12.1"
 
 # Kotlin ecosystem
 coroutines = "1.9.0"
@@ -64,6 +65,7 @@ androidx-appcompat = { module = "androidx.appcompat:appcompat", version.ref = "a
 androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "activityCompose" }
 androidx-lifecycle-runtime = { module = "androidx.lifecycle:lifecycle-runtime-ktx", version.ref = "lifecycle" }
 androidx-lifecycle-viewmodel-compose = { module = "androidx.lifecycle:lifecycle-viewmodel-compose", version.ref = "lifecycle" }
+androidx-webkit = { module = "androidx.webkit:webkit", version.ref = "webkit" }
 
 # --- Compose ---
 compose-bom = { module = "androidx.compose:compose-bom", version.ref = "composeBom" }
