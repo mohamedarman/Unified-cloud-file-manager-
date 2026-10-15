@@ -42,7 +42,6 @@ fun AppWebView() {
                 settings.apply {
                     javaScriptEnabled = true
                     domStorageEnabled = true
-                    databaseEnabled = true
                     allowFileAccess = true
                     allowContentAccess = true
                     useWideViewPort = true
@@ -52,15 +51,13 @@ fun AppWebView() {
                 }
 
                 webViewClient = object : WebViewClient() {
-                    @Deprecated("Deprecated in Java")
-                    override fun shouldOverrideUrlLoading(view: WebView?, url: String?): Boolean {
-                        url?.let {
-                            if (it.startsWith("file:///android_asset/") ||
-                                it.startsWith("http://") ||
-                                it.startsWith("https://")
-                            ) {
-                                return false
-                            }
+                    override fun shouldOverrideUrlLoading(view: WebView?, request: android.webkit.WebResourceRequest?): Boolean {
+                        val url = request?.url.toString()
+                        if (url.startsWith("file:///android_asset/") ||
+                            url.startsWith("http://") ||
+                            url.startsWith("https://")
+                        ) {
+                            return false
                         }
                         return false
                     }
