@@ -1,8 +1,11 @@
 package com.unifiedcloud.filemanager.data.db.dao
 
 import androidx.room.Dao
+import androidx.room.Insert
+import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Transaction
+import androidx.room.Update
 import androidx.room.Upsert
 import com.unifiedcloud.filemanager.data.db.entity.FavoriteFileEntity
 import com.unifiedcloud.filemanager.data.db.entity.FileMetadataEntity
@@ -156,20 +159,32 @@ interface FileDao {
     // Writes
     // -----------------------------------------------------------------------
 
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    suspend fun insertInternal(file: FileMetadataEntity): Long
+
+    @Update
+    suspend fun updateInternal(file: FileMetadataEntity)
+
     /**
      * Upserts a page of metadata.
      *
-     * `ON CONFLICT DO UPDATE` keyed on the `(account_id, file_id)` unique index,
-     * which is what makes a re-synced page idempotent. A `REPLACE` strategy would
-     * delete and reinsert, changing `local_id` and breaking the recents and
-     * favorites references - so `REPLACE` is wrong here in a way that is not
-     * obvious from the signature.
+     * Keyed on the `(account_id, file_id)` unique index. Keeps `local_id` intact when updating,
+     * which prevents breaking references in child tables.
      */
-    @Upsert
-    suspend fun upsertAll(files: List<FileMetadataEntity>)
+    @Transaction
+    suspend fun upsert(file: FileMetadataEntity) {
+        val existing = findByFileId(file.accountId, file.fileId)
+        if (existing == null) {
+            insertInternal(file)
+        } else {
+            updateInternal(file.copy(localId = existing.localId))
+        }
+    }
 
-    @Upsert
-    suspend fun upsert(file: FileMetadataEntity)
+    @Transaction
+    suspend fun upsertAll(files: List<FileMetadataEntity>) {
+        files.forEach { upsert(it) }
+    }
 
     /**
      * Removes one file's cached row.

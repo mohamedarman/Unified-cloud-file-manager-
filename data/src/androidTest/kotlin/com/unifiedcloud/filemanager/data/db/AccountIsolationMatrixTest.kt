@@ -268,8 +268,14 @@ class AccountIsolationMatrixTest {
     fun m13_recentsPruningIsBoundedAndAccountScoped() =
         runTest {
             // Account A is over the bound; account B is well under it.
-            repeat(5) { i -> files.recordAccess(accountA, "a$i", at = i.toLong(), max = 3) }
-            repeat(2) { i -> files.recordAccess(accountB, "b$i", at = i.toLong(), max = 3) }
+            repeat(5) { i ->
+                files.upsert(file(accountA, "a$i"))
+                files.recordAccess(accountA, "a$i", at = i.toLong(), max = 3)
+            }
+            repeat(2) { i ->
+                files.upsert(file(accountB, "b$i"))
+                files.recordAccess(accountB, "b$i", at = i.toLong(), max = 3)
+            }
 
             val recentsA = files.observeRecent(accountA, limit = 50, offset = 0).first()
             val recentsB = files.observeRecent(accountB, limit = 50, offset = 0).first()
@@ -283,6 +289,8 @@ class AccountIsolationMatrixTest {
     @Test
     fun m14_recentsAreOrderedNewestFirst() =
         runTest {
+            files.upsert(file(accountA, "old"))
+            files.upsert(file(accountA, "new"))
             files.recordAccess(accountA, "old", at = 1_000, max = 10)
             files.recordAccess(accountA, "new", at = 9_000, max = 10)
 
