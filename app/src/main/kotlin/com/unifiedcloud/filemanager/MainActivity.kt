@@ -15,7 +15,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.viewinterop.AndroidView
 
 class MainActivity : ComponentActivity() {
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -23,9 +22,9 @@ class MainActivity : ComponentActivity() {
             MaterialTheme {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
-                    color = MaterialTheme.colorScheme.background
+                    color = MaterialTheme.colorScheme.background,
                 ) {
-                    AppWebView()
+                    appWebView()
                 }
             }
         }
@@ -34,7 +33,7 @@ class MainActivity : ComponentActivity() {
 
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
-fun AppWebView() {
+fun appWebView() {
     AndroidView(
         modifier = Modifier.fillMaxSize(),
         factory = { context ->
@@ -50,24 +49,25 @@ fun AppWebView() {
                     setSupportZoom(false)
                 }
 
-                webViewClient = object : WebViewClient() {
-                    override fun shouldOverrideUrlLoading(
-                        view: WebView?,
-                        request: android.webkit.WebResourceRequest?,
-                    ): Boolean {
-                        val url = request?.url.toString()
-                        if (url.startsWith("file:///android_asset/") ||
-                            url.startsWith("http://") ||
-                            url.startsWith("https://")
-                        ) {
+                webViewClient =
+                    object : WebViewClient() {
+                        override fun shouldOverrideUrlLoading(
+                            view: WebView?,
+                            request: android.webkit.WebResourceRequest?,
+                        ): Boolean {
+                            val url = request?.url.toString()
+                            if (url.startsWith("file:///android_asset/") ||
+                                url.startsWith("http://") ||
+                                url.startsWith("https://")
+                            ) {
+                                return false
+                            }
                             return false
                         }
-                        return false
                     }
-                }
 
                 loadUrl("file:///android_asset/index.html")
             }
-        }
+        },
     )
 }
