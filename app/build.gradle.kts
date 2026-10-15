@@ -59,6 +59,22 @@ android {
 kotlin {
     jvmToolchain(17)
     compilerOptions { allWarningsAsErrors.set(true) }
+
+    tasks.register<Exec>("buildFrontend") {
+        workingDir = rootProject.projectDir
+        commandLine("npm", "install")
+        commandLine("npm", "run", "build")
+    }
+
+    tasks.register<Copy>("copyFrontendAssets") {
+        dependsOn("buildFrontend")
+        from("${rootProject.projectDir}/dist")
+        into("${projectDir}/src/main/assets")
+    }
+
+    tasks.named("preBuild") {
+        dependsOn("copyFrontendAssets")
+    }
 }
 
 dependencies {
