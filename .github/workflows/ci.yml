@@ -48,10 +48,6 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      # Required even here. Gradle configures every project by default, so the
-      # Android modules are configured - and AGP fails at CONFIGURATION time
-      # without an SDK, long before any of these gates run. Without this step
-      # this job would fail for a reason unrelated to what it checks.
       - name: Accept Android SDK licenses
         run: |
           mkdir -p "$ANDROID_HOME/licenses"
@@ -108,6 +104,18 @@ jobs:
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies and build web assets
+        run: |
+          bun install --frozen-lockfile
+          bun run build
+          mkdir -p app/src/main/assets
+          cp -r dist/* app/src/main/assets/
 
       - name: Cache Gradle packages and build outputs
         uses: actions/cache@v4
@@ -291,13 +299,6 @@ jobs:
       - name: Make gradlew executable
         run: chmod +x ./gradlew
 
-      # The Room schema does not exist yet - no @Entity has been written, which
-      # is Phase 6 work. This step distinguishes "not implemented yet" from
-      # "implemented but the schema was not committed", because those two must
-      # not look alike: the second is a data-loss bug, the first is simply early.
-      #
-      # Once the first entity lands, this stops being a special case and the
-      # drift check below becomes the whole gate.
       - name: Check Room schema state
         run: |
           if [ -d data/schemas ] && [ -n "$(ls -A data/schemas 2>/dev/null)" ]; then
@@ -325,10 +326,6 @@ jobs:
             echo "Skipping drift check - no schema exists yet."
           fi
 
-      # Migration *tests* are wired when the schema reaches version 2, at which
-      # point MigrationTestHelper asserts that every version has a migration.
-      # There is nothing to assert at version 1, and a check that reports success
-      # without checking anything is worse than no check.
       - name: Note on migration coverage
         run: |
           echo "Schema is at version 1. No migration paths exist to verify yet."
