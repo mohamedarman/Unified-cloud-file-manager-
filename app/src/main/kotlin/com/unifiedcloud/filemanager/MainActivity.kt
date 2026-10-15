@@ -51,7 +51,10 @@ fun AppWebView() {
                 }
 
                 webViewClient = object : WebViewClient() {
-                    override fun shouldOverrideUrlLoading(view: WebView?, request: android.webkit.WebResourceRequest?): Boolean {
+                    override fun shouldOverrideUrlLoading(
+                        view: WebView?,
+                        request: android.webkit.WebResourceRequest?,
+                    ): Boolean {
                         val url = request?.url.toString()
                         if (url.startsWith("file:///android_asset/") ||
                             url.startsWith("http://") ||
