@@ -64,6 +64,9 @@ kotlin {
 val rootDirPath = layout.projectDirectory.dir("..")
 val assetsFile = layout.projectDirectory.file("src/main/assets/index.html").asFile
 val pkgFile = rootDirPath.file("package.json").asFile
+val distDir = rootDirPath.dir("dist")
+val targetAssetsDir = layout.projectDirectory.dir("src/main/assets")
+val distFile = distDir.asFile
 val isWindows = System.getProperty("os.name").lowercase().contains("windows")
 
 val buildFrontend by tasks.registering(Exec::class) {
@@ -81,12 +84,8 @@ val buildFrontend by tasks.registering(Exec::class) {
 
 val copyFrontendAssets by tasks.registering(Copy::class) {
     dependsOn(buildFrontend)
-    val distDir = layout.projectDirectory.dir("../dist")
-    val targetDir = layout.projectDirectory.dir("src/main/assets")
-    val distFile = distDir.asFile
-
     from(distDir)
-    into(targetDir)
+    into(targetAssetsDir)
     onlyIf {
         distFile.exists()
     }
