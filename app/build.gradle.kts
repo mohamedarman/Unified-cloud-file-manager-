@@ -63,6 +63,11 @@ kotlin {
 
 val buildFrontend by tasks.registering(Exec::class) {
     workingDir = rootProject.projectDir
+    onlyIf {
+        !file("src/main/assets/index.html").exists() &&
+            rootProject.file("package.json").exists()
+    }
+    isIgnoreExitValue = true
     if (System.getProperty("os.name").lowercase().contains("windows")) {
         commandLine("cmd", "/c", "npm run build")
     } else {
@@ -74,6 +79,9 @@ val copyFrontendAssets by tasks.registering(Copy::class) {
     dependsOn(buildFrontend)
     from(rootProject.file("dist"))
     into(file("src/main/assets"))
+    onlyIf {
+        rootProject.file("dist").exists()
+    }
 }
 
 tasks.named("preBuild") {

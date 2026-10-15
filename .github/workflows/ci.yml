@@ -114,11 +114,10 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '22'
-          cache: 'npm'
 
       - name: Install dependencies and build web assets
         run: |
-          npm ci
+          if [ -f package-lock.json ]; then npm ci; else npm install; fi
           npm run lint
           npm run build
           mkdir -p app/src/main/assets
@@ -203,6 +202,18 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4.2.2
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Prepare web assets
+        run: |
+          if [ -f package-lock.json ]; then npm ci; else npm install; fi
+          npm run build
+          mkdir -p app/src/main/assets
+          cp -r dist/* app/src/main/assets/
 
       - name: Cache Gradle packages
         uses: actions/cache@v4.2.0

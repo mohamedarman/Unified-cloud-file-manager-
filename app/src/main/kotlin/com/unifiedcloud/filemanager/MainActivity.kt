@@ -2,10 +2,6 @@ package com.unifiedcloud.filemanager
 
 import android.annotation.SuppressLint
 import android.os.Bundle
-import android.util.Log
-import android.webkit.ConsoleMessage
-import android.webkit.WebChromeClient
-import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebSettings
@@ -19,7 +15,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.viewinterop.AndroidView
-import java.io.InputStream
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -38,7 +33,6 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-private const val TAG = "UnifiedCloudWebView"
 private const val LOCAL_HOST = "unifiedcloud.local"
 private const val APP_URL = "https://$LOCAL_HOST/index.html"
 
@@ -63,66 +57,36 @@ fun AppWebView() {
                     setSupportZoom(false)
                 }
 
-                webChromeClient = object : WebChromeClient() {
-                    override fun onConsoleMessage(consoleMessage: ConsoleMessage?): Boolean {
-                        val msg = consoleMessage?.message() ?: ""
-                        val source = consoleMessage?.sourceId() ?: ""
-                        val line = consoleMessage?.lineNumber() ?: 0
-                        Log.d(TAG, "[$source:$line] $msg")
-                        return true
-                    }
-                }
-
-                webViewClient = object : WebViewClient() {
-                    override fun shouldOverrideUrlLoading(
-                        view: WebView?,
-                        request: WebResourceRequest?,
-                    ): Boolean {
-                        val uri = request?.url ?: return false
-                        val host = uri.host
-                        if (host == LOCAL_HOST || uri.scheme == "file") {
-                            return false
+                webViewClient =
+                    object : WebViewClient() {
+                        override fun shouldOverrideUrlLoading(
+                            view: WebView?,
+                            request: WebResourceRequest?,
+                        ): Boolean {
+                            val uri = request?.url ?: return false
+                            return uri.host != LOCAL_HOST && uri.scheme != "file"
                         }
-                        return false
-                    }
 
-                    override fun shouldInterceptRequest(
-                        view: WebView?,
-                        request: WebResourceRequest?,
-                    ): WebResourceResponse? {
-                        val uri = request?.url ?: return null
-                        if (uri.host == LOCAL_HOST) {
-                            var rawPath = uri.path ?: "/index.html"
-                            if (rawPath.isEmpty() || rawPath == "/") {
-                                rawPath = "/index.html"
-                            }
-                            val assetPath = rawPath.removePrefix("/")
-                            return try {
-                                val stream: InputStream = context.assets.open(assetPath)
-                                val mimeType = getMimeType(assetPath)
-                                WebResourceResponse(mimeType, "UTF-8", stream)
-                            } catch (e: Exception) {
-                                Log.w(TAG, "Asset not found: $assetPath, fallback to index.html")
-                                try {
-                                    val stream: InputStream = context.assets.open("index.html")
-                                    WebResourceResponse("text/html", "UTF-8", stream)
-                                } catch (e2: Exception) {
-                                    Log.e(TAG, "Failed loading index.html fallback", e2)
-                                    null
+                        override fun shouldInterceptRequest(
+                            view: WebView?,
+                            request: WebResourceRequest?,
+                        ): WebResourceResponse? {
+                            val uri = request?.url ?: return null
+                            if (uri.host == LOCAL_HOST) {
+                                val rawPath = uri.path?.takeIf { it.isNotEmpty() && it != "/" } ?: "/index.html"
+                                val assetPath = rawPath.removePrefix("/")
+                                val mime = resolveMimeType(assetPath)
+                                return runCatching {
+                                    WebResourceResponse(mime, "UTF-8", context.assets.open(assetPath))
+                                }.getOrElse {
+                                    runCatching {
+                                        WebResourceResponse("text/html", "UTF-8", context.assets.open("index.html"))
+                                    }.getOrNull()
                                 }
                             }
+                            return super.shouldInterceptRequest(view, request)
                         }
-                        return super.shouldInterceptRequest(view, request)
                     }
-
-                    override fun onReceivedError(
-                        view: WebView?,
-                        request: WebResourceRequest?,
-                        error: WebResourceError?,
-                    ) {
-                        Log.e(TAG, "WebView error: ${request?.url} code=${error?.errorCode} desc=${error?.description}")
-                    }
-                }
 
                 loadUrl(APP_URL)
             }
@@ -130,22 +94,19 @@ fun AppWebView() {
     )
 }
 
-private fun getMimeType(path: String): String {
+private fun resolveMimeType(path: String): String {
     return when {
-        path.endsWith(".html", ignoreCase = true) -> "text/html"
-        path.endsWith(".js", ignoreCase = true) || path.endsWith(".mjs", ignoreCase = true) -> "application/javascript"
-        path.endsWith(".css", ignoreCase = true) -> "text/css"
-        path.endsWith(".svg", ignoreCase = true) -> "image/svg+xml"
-        path.endsWith(".png", ignoreCase = true) -> "image/png"
-        path.endsWith(".jpg", ignoreCase = true) || path.endsWith(".jpeg", ignoreCase = true) -> "image/jpeg"
-        path.endsWith(".gif", ignoreCase = true) -> "image/gif"
-        path.endsWith(".webp", ignoreCase = true) -> "image/webp"
-        path.endsWith(".json", ignoreCase = true) -> "application/json"
-        path.endsWith(".ico", ignoreCase = true) -> "image/x-icon"
-        path.endsWith(".woff", ignoreCase = true) -> "font/woff"
-        path.endsWith(".woff2", ignoreCase = true) -> "font/woff2"
-        path.endsWith(".ttf", ignoreCase = true) -> "font/ttf"
+        path.endsWith(".html") -> "text/html"
+        path.endsWith(".js") || path.endsWith(".mjs") -> "application/javascript"
+        path.endsWith(".css") -> "text/css"
+        path.endsWith(".svg") -> "image/svg+xml"
+        path.endsWith(".png") -> "image/png"
+        path.endsWith(".jpg") || path.endsWith(".jpeg") -> "image/jpeg"
+        path.endsWith(".json") -> "application/json"
+        path.endsWith(".ico") -> "image/x-icon"
+        path.endsWith(".woff2") -> "font/woff2"
         else -> "application/octet-stream"
     }
 }
+
 
