@@ -47,7 +47,7 @@ export interface ModalManagerState {
 }
 
 export function useModalManager(): ModalManagerState {
-  const [isUploadOpen, setIsUploadOpen] = useState(false);
+  const [isUploadOpen, setIsUploadOpen] = useState<boolean>(false);
   const [isAddAccountOpen, setIsAddAccountOpen] = useState(false);
   const [isNewFolderOpen, setIsNewFolderOpen] = useState(false);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
