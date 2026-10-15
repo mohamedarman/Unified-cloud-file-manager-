@@ -65,7 +65,7 @@ jobs:
           printf "e9acab5b5fbb560a72cfa4e23e338b00a0815979\n" > "$ANDROID_HOME/licenses/mips-android-sysimage-license"
 
       - name: Set up Android SDK
-        uses: android-actions/setup-android@v3.2.1
+        uses: android-actions/setup-android@v4.0.4
         with:
           cmdline-tools-version: '11076708'
           accept-android-sdk-licenses: true
