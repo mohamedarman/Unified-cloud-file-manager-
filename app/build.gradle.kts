@@ -61,35 +61,85 @@ kotlin {
     compilerOptions { allWarningsAsErrors.set(true) }
 }
 
-val rootDirPath = layout.projectDirectory.dir("..")
-val assetsFile = layout.projectDirectory.file("src/main/assets/index.html").asFile
-val pkgFile = rootDirPath.file("package.json").asFile
-val distDir = rootDirPath.dir("dist")
-val targetAssetsDir = layout.projectDirectory.dir("src/main/assets")
-val distFile = distDir.asFile
-val isWindows = System.getProperty("os.name").lowercase().contains("windows")
+abstract class BuildFrontendTask : DefaultTask() {
+    @get:Inject
+    abstract val execOperations: ExecOperations
 
-val buildFrontend by tasks.registering(Exec::class) {
-    workingDir(rootDirPath)
-    onlyIf {
-        !assetsFile.exists() && pkgFile.exists()
-    }
-    isIgnoreExitValue = true
-    if (isWindows) {
-        commandLine("cmd", "/c", "npm run build")
-    } else {
-        commandLine("npm", "run", "build")
+    @get:Internal
+    abstract val projectRoot: DirectoryProperty
+
+    @get:OutputDirectory
+    abstract val outputDir: DirectoryProperty
+
+    @TaskAction
+    fun build() {
+        val rootDir = projectRoot.get().asFile
+        val isWindows = System.getProperty("os.name").lowercase().contains("windows")
+        val nodeModules = java.io.File(rootDir, "node_modules")
+        val lockFile = java.io.File(rootDir, "package-lock.json")
+
+        if (!nodeModules.exists()) {
+            execOperations.exec {
+                workingDir = rootDir
+                if (isWindows) {
+                    if (lockFile.exists()) {
+                        commandLine("cmd", "/c", "npm ci")
+                    } else {
+                        commandLine("cmd", "/c", "npm install")
+                    }
+                } else {
+                    if (lockFile.exists()) {
+                        commandLine("npm", "ci")
+                    } else {
+                        commandLine("npm", "install")
+                    }
+                }
+            }
+        }
+
+        execOperations.exec {
+            workingDir = rootDir
+            if (isWindows) {
+                commandLine("cmd", "/c", "npm run build")
+            } else {
+                commandLine("npm", "run", "build")
+            }
+        }
     }
 }
 
-val copyFrontendAssets by tasks.registering(Copy::class) {
-    dependsOn(buildFrontend)
-    from(distDir)
-    into(targetAssetsDir)
-    onlyIf {
-        distFile.exists()
+abstract class CopyFrontendAssetsTask : DefaultTask() {
+    @get:Inject
+    abstract val fileSystemOperations: FileSystemOperations
+
+    @get:InputDirectory
+    @get:PathSensitive(PathSensitivity.RELATIVE)
+    abstract val sourceDir: DirectoryProperty
+
+    @get:OutputDirectory
+    abstract val targetDir: DirectoryProperty
+
+    @TaskAction
+    fun copyAssets() {
+        fileSystemOperations.copy {
+            from(sourceDir)
+            into(targetDir)
+        }
     }
 }
+
+val buildFrontend =
+    tasks.register<BuildFrontendTask>("buildFrontend") {
+        projectRoot.set(layout.projectDirectory.dir(".."))
+        outputDir.set(layout.projectDirectory.dir("../dist"))
+    }
+
+val copyFrontendAssets =
+    tasks.register<CopyFrontendAssetsTask>("copyFrontendAssets") {
+        dependsOn(buildFrontend)
+        sourceDir.set(buildFrontend.flatMap { it.outputDir })
+        targetDir.set(layout.projectDirectory.dir("src/main/assets"))
+    }
 
 tasks.named("preBuild") {
     dependsOn(copyFrontendAssets)
