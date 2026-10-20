@@ -54,7 +54,7 @@ class RedactorTest {
         val masked = Redactor.maskSecret("super-secret-refresh-token-value")
 
         assertFalse(masked.contains("super-secret"))
-        assertTrue(masked.endsWith("alue"))
+        assertTrue(masked.endsWith("alue>"))
         assertEquals("<redacted:alue>", masked)
     }
 

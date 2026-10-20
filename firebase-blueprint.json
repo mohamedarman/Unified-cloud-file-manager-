@@ -1,0 +1,37 @@
+{
+  "entities": {
+    "account": {
+      "title": "Account Reference",
+      "description": "User cloud storage account",
+      "type": "object",
+      "properties": {
+        "localId": { "type": "number" },
+        "provider": { "type": "string" },
+        "displayEmail": { "type": "string" },
+        "displayName": { "type": "string" }
+      },
+      "required": ["localId", "provider"]
+    },
+    "file": {
+      "title": "Cloud File",
+      "description": "Metadata for a cloud file",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "size": { "type": "number" }
+      },
+      "required": ["id", "name"]
+    }
+  },
+  "firestore": {
+    "/accounts/{userId}/data/{accountId}": {
+      "schema": "account",
+      "description": "User accounts"
+    },
+    "/files/{userId}/data/{fileId}": {
+      "schema": "file",
+      "description": "User files"
+    }
+  }
+}

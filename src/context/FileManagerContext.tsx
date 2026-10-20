@@ -26,6 +26,7 @@ import {
 import { AccountStateMachine } from '../utils/accountStateMachine';
 import { globalQuotaGovernor } from '../utils/quotaGovernor';
 import { Redactor } from '../utils/redactor';
+import { useAuth } from './AuthContext';
 
 export type NavigationTab =
   // Command Center
@@ -187,37 +188,83 @@ interface FileManagerContextType {
 const FileManagerContext = createContext<FileManagerContextType | undefined>(undefined);
 
 export const FileManagerProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  // Load from localStorage or defaults
-  const [accounts, setAccounts] = useState<AccountRef[]>(() => {
-    const saved = localStorage.getItem('ucfm_accounts_v2');
-    return saved ? JSON.parse(saved) : INITIAL_ACCOUNTS;
-  });
+  // Defensive helpers for localStorage persistence
+  function safeGetItem<T>(key: string, fallback: T): T {
+    try {
+      const saved = localStorage.getItem(key);
+      if (!saved) return fallback;
+      return JSON.parse(saved) as T;
+    } catch (e) {
+      console.warn(`Failed to parse ${key} from storage, falling back to default:`, e);
+      return fallback;
+    }
+  }
 
-  const [files, setFiles] = useState<CloudFile[]>(() => {
-    const saved = localStorage.getItem('ucfm_files_v2');
-    return saved ? JSON.parse(saved) : INITIAL_FILES;
-  });
+  function safeSetItem(key: string, value: unknown): void {
+    try {
+      localStorage.setItem(key, JSON.stringify(value));
+    } catch (e) {
+      console.error(`Failed to sync ${key} to localStorage:`, e);
+    }
+  }
 
-  const [capabilities, setCapabilities] = useState<Record<number, ProviderCapabilities>>(() => {
-    const saved = localStorage.getItem('ucfm_capabilities_v2');
-    return saved ? JSON.parse(saved) : INITIAL_CAPABILITIES;
-  });
+  const auth = useAuth();
+  const userId = auth?.user?.id || 'guest_user';
+  const isOwner = auth?.user?.email === 'mohamedarman536@gmail.com' || userId === 'usr_owner_001';
 
-  const [quotas, setQuotas] = useState<Record<number, QuotaUsage>>(() => {
-    const saved = localStorage.getItem('ucfm_quotas_v2');
-    return saved ? JSON.parse(saved) : INITIAL_QUOTA;
-  });
+  // Scoped storage keys for strict account isolation
+  const accountsKey = `ucfm_accounts_v2_${userId}`;
+  const filesKey = `ucfm_files_v2_${userId}`;
+  const capabilitiesKey = `ucfm_capabilities_v2_${userId}`;
+  const quotasKey = `ucfm_quotas_v2_${userId}`;
+  const pendingOpsKey = `ucfm_pending_ops_v2_${userId}`;
+  const auditLogsKey = `ucfm_audit_logs_v2_${userId}`;
 
-  const [pendingOperations, setPendingOperations] = useState<PendingOperation[]>(() => {
-    const saved = localStorage.getItem('ucfm_pending_ops_v2');
-    return saved ? JSON.parse(saved) : [];
-  });
+  // Default fallbacks: owner gets initial demo workspace, new accounts get genuine empty state
+  const defaultAccounts = isOwner ? INITIAL_ACCOUNTS : [];
+  const defaultFiles = isOwner ? INITIAL_FILES : [];
+  const defaultCapabilities = isOwner ? INITIAL_CAPABILITIES : {};
+  const defaultQuotas = isOwner ? INITIAL_QUOTA : {};
+
+  // Load from scoped localStorage or defaults
+  const [accounts, setAccounts] = useState<AccountRef[]>(() =>
+    safeGetItem(accountsKey, defaultAccounts)
+  );
+
+  const [files, setFiles] = useState<CloudFile[]>(() =>
+    safeGetItem(filesKey, defaultFiles)
+  );
+
+  const [capabilities, setCapabilities] = useState<Record<number, ProviderCapabilities>>(() =>
+    safeGetItem(capabilitiesKey, defaultCapabilities)
+  );
+
+  const [quotas, setQuotas] = useState<Record<number, QuotaUsage>>(() =>
+    safeGetItem(quotasKey, defaultQuotas)
+  );
+
+  const [pendingOperations, setPendingOperations] = useState<PendingOperation[]>(() =>
+    safeGetItem(pendingOpsKey, [])
+  );
 
   const [transfers, setTransfers] = useState<TransferItem[]>([]);
-  const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>(() => {
-    const saved = localStorage.getItem('ucfm_audit_logs_v2');
-    return saved ? JSON.parse(saved) : [];
-  });
+  const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>(() =>
+    safeGetItem(auditLogsKey, [])
+  );
+
+  // When active user changes (login, signup, account switch), reload scoped state
+  useEffect(() => {
+    setAccounts(safeGetItem(accountsKey, defaultAccounts));
+    setFiles(safeGetItem(filesKey, defaultFiles));
+    setCapabilities(safeGetItem(capabilitiesKey, defaultCapabilities));
+    setQuotas(safeGetItem(quotasKey, defaultQuotas));
+    setPendingOperations(safeGetItem(pendingOpsKey, []));
+    setAuditLogs(safeGetItem(auditLogsKey, []));
+    setCurrentFolderId(null);
+    setFolderHistory([]);
+    setSelectedFileKeys(new Set());
+    setInspectedFile(null);
+  }, [userId]);
 
   // Navigation and UI state
   const [activeAccountId, setActiveAccountId] = useState<LocalAccountId | 'ALL'>('ALL');
@@ -242,30 +289,30 @@ export const FileManagerProvider: React.FC<{ children: ReactNode }> = ({ childre
     setQuotaSnapshot(globalQuotaGovernor.snapshot());
   };
 
-  // Sync to localStorage
+  // Sync to scoped localStorage safely
   useEffect(() => {
-    localStorage.setItem('ucfm_accounts_v2', JSON.stringify(accounts));
-  }, [accounts]);
+    safeSetItem(accountsKey, accounts);
+  }, [accounts, accountsKey]);
 
   useEffect(() => {
-    localStorage.setItem('ucfm_files_v2', JSON.stringify(files));
-  }, [files]);
+    safeSetItem(filesKey, files);
+  }, [files, filesKey]);
 
   useEffect(() => {
-    localStorage.setItem('ucfm_capabilities_v2', JSON.stringify(capabilities));
-  }, [capabilities]);
+    safeSetItem(capabilitiesKey, capabilities);
+  }, [capabilities, capabilitiesKey]);
 
   useEffect(() => {
-    localStorage.setItem('ucfm_quotas_v2', JSON.stringify(quotas));
-  }, [quotas]);
+    safeSetItem(quotasKey, quotas);
+  }, [quotas, quotasKey]);
 
   useEffect(() => {
-    localStorage.setItem('ucfm_pending_ops_v2', JSON.stringify(pendingOperations));
-  }, [pendingOperations]);
+    safeSetItem(pendingOpsKey, pendingOperations);
+  }, [pendingOperations, pendingOpsKey]);
 
   useEffect(() => {
-    localStorage.setItem('ucfm_audit_logs_v2', JSON.stringify(auditLogs));
-  }, [auditLogs]);
+    safeSetItem(auditLogsKey, auditLogs);
+  }, [auditLogs, auditLogsKey]);
 
   const [syncStatuses, setSyncStatuses] = useState<Record<LocalAccountId, ProviderSyncStatus>>(() => {
     const saved = localStorage.getItem('ucfm_sync_statuses_v2');
@@ -920,11 +967,20 @@ export const FileManagerProvider: React.FC<{ children: ReactNode }> = ({ childre
   };
 
   const resetAllData = () => {
-    localStorage.clear();
-    setAccounts(INITIAL_ACCOUNTS);
-    setFiles(INITIAL_FILES);
-    setCapabilities(INITIAL_CAPABILITIES);
-    setQuotas(INITIAL_QUOTA);
+    try {
+      localStorage.removeItem(accountsKey);
+      localStorage.removeItem(filesKey);
+      localStorage.removeItem(capabilitiesKey);
+      localStorage.removeItem(quotasKey);
+      localStorage.removeItem(pendingOpsKey);
+      localStorage.removeItem(auditLogsKey);
+    } catch (e) {
+      console.warn('Failed to clear scoped storage on reset:', e);
+    }
+    setAccounts(defaultAccounts);
+    setFiles(defaultFiles);
+    setCapabilities(defaultCapabilities);
+    setQuotas(defaultQuotas);
     setPendingOperations([]);
     setTransfers([]);
     setAuditLogs([]);

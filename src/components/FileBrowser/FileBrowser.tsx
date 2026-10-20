@@ -24,6 +24,8 @@ import {
   SlidersHorizontal,
   CloudUpload,
   Sparkles,
+  Cloud,
+  Plus,
 } from 'lucide-react';
 import { useFileManager, SortOption, FilterOption } from '../../context/FileManagerContext';
 import { CloudFile, ProviderId, PROVIDERS, cacheKey } from '../../types';
@@ -37,6 +39,7 @@ interface FileBrowserProps {
   onOpenDetails: (file: CloudFile) => void;
   onOpenQuickLook?: (file: CloudFile) => void;
   onOpenMove?: (file: CloudFile) => void;
+  onOpenAddAccount?: () => void;
 }
 
 export const FileBrowser: React.FC<FileBrowserProps> = ({
@@ -44,10 +47,12 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
   onOpenNewFolder,
   onOpenDetails,
   onOpenQuickLook,
+  onOpenAddAccount,
 }) => {
   const {
     files,
     accounts,
+    resetAllData,
     activeAccountId,
     activeProvider,
     setActiveProvider,
@@ -719,7 +724,38 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
 
       {/* Main Files View */}
       <div className={`flex-1 overflow-y-auto pb-28 sm:pb-28 ${density === 'compact' ? 'p-2 sm:p-3' : 'p-3 sm:p-4'}`}>
-        {displayedFiles.length === 0 ? (
+        {accounts.length === 0 ? (
+          <div className="h-72 flex flex-col items-center justify-center text-slate-400 text-center px-4">
+            <div className="w-14 h-14 rounded-2xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-500 mb-3">
+              <Cloud className="w-7 h-7" />
+            </div>
+            <p className="font-semibold text-slate-800 dark:text-slate-100 text-base">
+              No Cloud Accounts Connected
+            </p>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-sm leading-relaxed">
+              Link your Google Drive, Microsoft OneDrive, Dropbox, or Box accounts to browse, search, and manage files securely across clouds.
+            </p>
+            <div className="flex flex-wrap gap-2.5 mt-4 justify-center">
+              {onOpenAddAccount && (
+                <button
+                  type="button"
+                  onClick={onOpenAddAccount}
+                  className="flex items-center gap-1.5 px-4 py-2 text-xs bg-blue-600 hover:bg-blue-500 text-white rounded-xl transition font-medium cursor-pointer shadow-sm"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Connect Cloud Account</span>
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={resetAllData}
+                className="flex items-center gap-1.5 px-3.5 py-2 text-xs bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl transition font-medium cursor-pointer border border-slate-200 dark:border-slate-700"
+              >
+                <span>Load Sample Workspace</span>
+              </button>
+            </div>
+          </div>
+        ) : displayedFiles.length === 0 ? (
           <div className="h-64 flex flex-col items-center justify-center text-slate-400 text-center">
             <FileQuestion className="w-12 h-12 text-slate-300 dark:text-slate-600 mb-2" />
             <p className="font-semibold text-slate-700 dark:text-slate-200 text-sm">

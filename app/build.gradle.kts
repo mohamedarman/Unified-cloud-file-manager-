@@ -1,4 +1,6 @@
 // :app - Compose UI, navigation, DI container, DocumentsProvider, workers.
+import java.io.File
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -75,8 +77,8 @@ abstract class BuildFrontendTask : DefaultTask() {
     fun build() {
         val rootDir = projectRoot.get().asFile
         val isWindows = System.getProperty("os.name").lowercase().contains("windows")
-        val nodeModules = java.io.File(rootDir, "node_modules")
-        val lockFile = java.io.File(rootDir, "package-lock.json")
+        val nodeModules = File(rootDir, "node_modules")
+        val lockFile = File(rootDir, "package-lock.json")
 
         if (!nodeModules.exists()) {
             execOperations.exec {
@@ -144,7 +146,6 @@ val copyFrontendAssets =
 tasks.named("preBuild") {
     dependsOn(copyFrontendAssets)
 }
-
 
 dependencies {
     implementation(project(":domain"))

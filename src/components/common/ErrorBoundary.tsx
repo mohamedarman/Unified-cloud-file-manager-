@@ -1,10 +1,9 @@
 import React, { Component, ErrorInfo, ReactNode } from 'react';
-import { AlertOctagon, RotateCcw, Home, Terminal } from 'lucide-react';
+import { AlertTriangle, RefreshCw, Trash2 } from 'lucide-react';
 
 interface Props {
   children: ReactNode;
   fallbackTitle?: string;
-  onReset?: () => void;
 }
 
 interface State {
@@ -25,64 +24,72 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error('Uncaught error caught by ErrorBoundary:', error, errorInfo);
-    this.setState({ errorInfo });
+    this.setState({ error, errorInfo });
+    console.error('ErrorBoundary caught an unhandled error:', error, errorInfo);
   }
 
-  private handleReset = () => {
-    this.setState({ hasError: false, error: null, errorInfo: null });
-    this.props.onReset?.();
+  private handleReload = () => {
+    window.location.reload();
   };
 
-  private handleReload = () => {
+  private handleResetStorage = () => {
+    try {
+      const keysToRemove = [
+        'ucfm_auth_user',
+        'ucfm_accounts_v2',
+        'ucfm_files_v2',
+        'ucfm_capabilities_v2',
+        'ucfm_quotas_v2',
+        'ucfm_pending_ops_v2',
+        'ucfm_audit_logs_v2',
+        'ucfm_theme',
+      ];
+      keysToRemove.forEach((k) => localStorage.removeItem(k));
+    } catch (e) {
+      console.error('Failed to clear storage:', e);
+    }
     window.location.reload();
   };
 
   public render() {
     if (this.state.hasError) {
       return (
-        <div className="flex-1 flex items-center justify-center p-6 bg-slate-50 dark:bg-slate-950 min-h-[400px]">
-          <div className="max-w-md w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-xl text-center">
-            <div className="w-12 h-12 rounded-xl bg-rose-100 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 flex items-center justify-center mx-auto mb-4 border border-rose-200 dark:border-rose-900/40">
-              <AlertOctagon className="w-6 h-6" />
+        <div className="min-h-screen w-screen flex flex-col items-center justify-center bg-slate-950 text-slate-100 p-6 font-sans">
+          <div className="max-w-md w-full bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-2xl flex flex-col items-center text-center">
+            <div className="w-12 h-12 rounded-full bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-400 mb-4">
+              <AlertTriangle className="w-6 h-6" />
             </div>
-
-            <h2 className="text-base font-bold text-slate-900 dark:text-white mb-1">
-              {this.props.fallbackTitle || 'Component Error Detected'}
-            </h2>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mb-4 leading-relaxed">
-              An unexpected exception occurred while rendering this multi-cloud view. The rest of your cloud session remains active.
+            <h1 className="text-xl font-bold text-white mb-2">
+              {this.props.fallbackTitle || 'Workspace Recovery'}
+            </h1>
+            <p className="text-sm text-slate-400 mb-4 leading-relaxed">
+              Unified Cloud File Manager encountered an unexpected state and preserved your secure session.
             </p>
 
             {this.state.error && (
-              <div className="mb-4 text-left p-3 rounded-lg bg-slate-100 dark:bg-slate-850 border border-slate-200 dark:border-slate-800 text-[11px] font-mono text-rose-600 dark:text-rose-400 overflow-x-auto max-h-32">
-                <div className="flex items-center gap-1.5 font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  <Terminal className="w-3.5 h-3.5" />
-                  <span>{this.state.error.name}: {this.state.error.message}</span>
+              <div className="w-full bg-slate-950 border border-slate-800/80 rounded-lg p-3 text-left mb-6 overflow-hidden">
+                <div className="text-xs font-mono text-red-400 truncate">
+                  {this.state.error.message || 'Unknown error occurred'}
                 </div>
-                {this.state.errorInfo?.componentStack && (
-                  <pre className="text-[10px] text-slate-500 dark:text-slate-400 whitespace-pre-wrap">
-                    {this.state.errorInfo.componentStack.slice(0, 300)}...
-                  </pre>
-                )}
               </div>
             )}
 
-            <div className="flex items-center justify-center gap-2">
+            <div className="flex flex-col sm:flex-row gap-3 w-full">
               <button
-                onClick={this.handleReset}
-                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium shadow-xs transition cursor-pointer"
-              >
-                <RotateCcw className="w-3.5 h-3.5" />
-                <span>Retry View</span>
-              </button>
-
-              <button
+                type="button"
                 onClick={this.handleReload}
-                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-medium transition cursor-pointer"
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-medium text-sm transition-colors shadow-sm"
               >
-                <Home className="w-3.5 h-3.5" />
-                <span>Reload App</span>
+                <RefreshCw className="w-4 h-4" />
+                Reload App
+              </button>
+              <button
+                type="button"
+                onClick={this.handleResetStorage}
+                className="flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg font-medium text-sm transition-colors border border-slate-700"
+              >
+                <Trash2 className="w-4 h-4" />
+                Reset Cache
               </button>
             </div>
           </div>

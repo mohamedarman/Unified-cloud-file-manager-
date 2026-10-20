@@ -95,6 +95,7 @@ export const ViewRouter: React.FC<ViewRouterProps> = ({
             onOpenDetails={onOpenDetails}
             onOpenQuickLook={onOpenQuickLook}
             onOpenMove={onOpenMove}
+            onOpenAddAccount={onOpenAddAccount}
           />
         );
       case 'gallery':

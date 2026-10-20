@@ -17,7 +17,7 @@ import { useAuth } from '../../context/AuthContext';
 import { toast } from 'sonner';
 
 export const LoginPage: React.FC = () => {
-  const { loginWithGoogle, loginWithEmail, signupWithEmail } = useAuth();
+  const { loginWithGoogle, loginWithEmail, signupWithEmail, sessionError, clearSessionError, availableUsers } = useAuth();
 
   const [mode, setMode] = useState<'signin' | 'signup'>('signin');
   const [email, setEmail] = useState('');
@@ -44,19 +44,21 @@ export const LoginPage: React.FC = () => {
       setError(`Too many failed attempts. Please wait ${cooldownSeconds}s before retrying.`);
       return;
     }
+    clearSessionError();
     setIsLoading(true);
     setError(null);
     try {
-      await loginWithGoogle('mohamedarman536@gmail.com', 'Mohamed Arman');
+      await loginWithGoogle();
       setFailedAttempts(0);
-    } catch (err: any) {
+    } catch (err: unknown) {
       const nextFail = failedAttempts + 1;
       setFailedAttempts(nextFail);
+      const errMsg = err instanceof Error ? err.message : 'Failed to sign in with Google';
       if (nextFail >= 5) {
         setCooldownSeconds(60);
         setError('Too many failed attempts. Security cooldown active for 60 seconds.');
       } else {
-        setError(err?.message || 'Failed to sign in with Google');
+        setError(errMsg);
       }
     } finally {
       setIsLoading(false);
@@ -317,27 +319,6 @@ export const LoginPage: React.FC = () => {
                 </button>
               </p>
             )}
-          </div>
-
-          {/* Quick 1-Click Demo Logins */}
-          <div className="pt-2 bg-slate-50 p-3 rounded-2xl border border-slate-200/70">
-            <span className="text-[11px] font-semibold text-slate-500 block mb-1.5 text-center">
-              Quick 1-Click Demo Login:
-            </span>
-            <div className="flex gap-2 justify-center">
-              <button
-                onClick={() => loginWithGoogle('mohamedarman536@gmail.com', 'Mohamed Arman')}
-                className="px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 hover:border-blue-400 text-[11px] font-medium text-slate-700 hover:text-blue-600 shadow-2xs transition"
-              >
-                👤 Mohamed Arman
-              </button>
-              <button
-                onClick={() => loginWithEmail('alex.morgan@gmail.com', 'password123')}
-                className="px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 hover:border-blue-400 text-[11px] font-medium text-slate-700 hover:text-blue-600 shadow-2xs transition"
-              >
-                👤 Alex Morgan
-              </button>
-            </div>
           </div>
         </div>
       </main>

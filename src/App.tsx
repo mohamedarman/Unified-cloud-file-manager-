@@ -149,7 +149,16 @@ const AuthenticatedDashboard: React.FC = () => {
 };
 
 export const AppContent: React.FC = () => {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, isInitializing } = useAuth();
+
+  if (isInitializing) {
+    return (
+      <div className="min-h-screen w-screen flex flex-col items-center justify-center bg-slate-950 text-white font-sans">
+        <Loader2 className="w-8 h-8 animate-spin text-blue-500 mb-3" />
+        <span className="text-sm text-slate-400 font-medium">Verifying workspace session...</span>
+      </div>
+    );
+  }
 
   if (!isAuthenticated) {
     return (

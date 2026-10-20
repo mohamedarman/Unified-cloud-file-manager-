@@ -1,0 +1,503 @@
+MASTER ENGINEERING PROMPT — UNIFIED CLOUD MEMORY
+
+Full Android Recovery, Authentication, Database Isolation, UI/UX, Testing and APK Release
+
+Act as a senior Android engineer, Kotlin/Gradle build engineer, backend and database architect, application security engineer, QA automation engineer, and professional product UI/UX designer.
+
+Your task is to repair my EXISTING Unified Cloud Memory / Unified Cloud File Manager application until it builds, launches, authenticates users correctly, isolates account data, persists data, passes meaningful automated tests, and produces an installable Android APK through GitHub Actions.
+
+This is a real debugging and recovery task, not a request to generate a new demo application or merely redesign screenshots.
+
+1. PROJECT CONTEXT
+
+Repository: https://github.com/mohamedarman536-dotcom/Unified-cloud-file-manager-
+
+Platform: Android
+Primary language: Kotlin
+Build system: Gradle
+Database: Inspect the existing implementation; Room database schema and generation have previously been areas of concern.
+CI: GitHub Actions
+Current symptoms:
+
+- App opens to a white screen or does not initialize properly.
+- Login may show the same data as the AI Studio preview or default/demo state.
+- Different users may not have properly isolated data.
+- Database persistence and authentication behavior are unreliable.
+- GitHub Actions Android APK builds and CI checks repeatedly fail.
+- Previous attempts to fix errors using AI Studio did not reliably resolve the problems.
+
+IMPORTANT: The statements above describe symptoms, not proven root causes. Verify the actual source code, runtime behavior, build logs and database implementation before diagnosing them.
+
+I have already uploaded a testing skill to this AI Studio project. Inspect the available skill and its instructions first. Use that skill's actual testing methods, checklists, conventions and tools wherever applicable. Do not claim to have used it unless you actually inspect and apply it.
+
+2. NON-NEGOTIABLE ENGINEERING RULES
+
+1. Inspect the complete relevant existing source before editing.
+2. Preserve the current application identity, useful features, architecture and existing user data.
+3. Do not replace the project with a toy app, mockup, static prototype or unrelated implementation.
+4. Do not perform a massive rewrite just because the current code is difficult to understand.
+5. Do not assume that the app uses Firebase, Supabase, a remote API, WebView, or any other backend. Discover the real architecture first.
+6. Never claim a build, test, installation, login or database operation passed unless the relevant command or test actually ran successfully.
+7. Never silence Detekt, disable tests, remove failing test cases, weaken assertions, exclude problematic source files, or delete application functionality to manufacture a green pipeline.
+8. Do not blindly change dependency versions, Gradle plugin versions, Kotlin versions, compile SDK, target SDK or Java toolchains.
+9. Do not delete existing Room databases, migrations, schemas or user records as a shortcut.
+10. Do not hardcode credentials, passwords, API keys, tokens, signing secrets or production service-account credentials.
+11. Do not introduce an entirely new backend or database unless the existing architecture demonstrably cannot meet the requirements and a migration plan is provided.
+12. Do not leave critical features implemented only as TODOs, fake buttons, hardcoded responses or simulated authentication.
+13. Make small, coherent, reviewable changes. Run the narrowest relevant tests after each change, followed by the complete required verification suite.
+14. If a required service, emulator, credential, runtime or external environment is unavailable, report that limitation honestly and provide the exact next verification step.
+15. Never promise literally zero bugs. Demonstrate the strongest verification achievable and report remaining risks.
+
+3. PHASE A — INSPECT AND DIAGNOSE BEFORE MODIFYING
+
+First inspect:
+
+- Repository tree and module boundaries.
+- settings.gradle / settings.gradle.kts.
+- Root and module-level build.gradle files.
+- Gradle wrapper and Java/Kotlin configuration.
+- AndroidManifest.xml files and application/activity entry points.
+- Navigation and startup initialization.
+- Dependency injection and lifecycle management.
+- Authentication repositories, session management and account switching.
+- Room entities, DAOs, database classes, migrations and generated schema files.
+- Repository implementations and data-source selection.
+- Local preferences, caches, DataStore and other persistence mechanisms.
+- Network configuration, API clients, service endpoints and backend deployment assumptions.
+- Dependency versions, Android permissions, ProGuard/R8 rules and build variants.
+- Existing unit tests, instrumented tests and test fixtures.
+- Every GitHub Actions workflow under .github/workflows/.
+- Current CI logs, APK build failures and the most recent failing stack traces.
+- Existing Detekt configuration, baselines and quality rules.
+
+Use the available GitHub integration or repository tools to inspect the actual files. If access is unavailable, ask me to provide the repository ZIP and complete failing logs. Never invent source files or pretend the repository was inspected.
+
+Produce an initial diagnosis table:
+
+| Symptom | Evidence/file/stack trace | Verified root cause or hypothesis | Proposed minimal fix | Regression test |
+
+Clearly distinguish confirmed causes from hypotheses.
+
+Prioritize startup crashes, incorrect data-source selection, authentication and database integrity before cosmetic improvements.
+
+4. PHASE B — ELIMINATE THE WHITE SCREEN
+
+Trace the actual startup path from Application initialization through activity creation, navigation, dependency injection, database initialization and the first rendered screen.
+
+Investigate as applicable:
+
+- Startup exceptions and fatal crashes.
+- Incorrect launcher activity or manifest configuration.
+- Missing or invalid dependencies.
+- Navigation destinations that never resolve.
+- Blocking main-thread operations and deadlocks.
+- Coroutines that never complete or fail silently.
+- Incorrect lifecycle collection or state initialization.
+- Compose rendering errors, if Jetpack Compose is used.
+- Fragment/view inflation failures, if XML or fragments are used.
+- Failed API calls that prevent initial rendering.
+- Missing Internet permission or invalid network security configuration, if relevant.
+- Database migrations or dependency injection failures.
+- Incorrect build variants or configuration values.
+- Infinite loading states and improperly handled null data.
+
+Implement a robust startup state model appropriate to the existing architecture:
+
+- Initializing.
+- Signed out.
+- Authenticated and loading data.
+- Ready.
+- Empty state for a genuinely empty account.
+- Recoverable error with retry.
+- Unrecoverable startup error with useful diagnostics.
+
+Never display a blank screen indefinitely. Provide a useful error and retry mechanism where recovery is possible.
+
+Do not hide fatal errors behind a generic catch-all. Preserve useful diagnostic logs without exposing passwords, tokens, private file content or other sensitive data.
+
+Add regression tests for the verified startup failure. Confirm that the first screen renders and that errors produce a useful state.
+
+5. PHASE C — REAL AUTHENTICATION AND ACCOUNT ISOLATION
+
+Determine whether authentication currently exists and whether it is backed by a real identity system.
+
+Implement or repair authentication using the existing supported architecture.
+
+Required behavior:
+
+- Register an account, if registration is supported.
+- Validate credentials and display appropriate errors.
+- Log in and establish a valid session.
+- Restore a valid session safely after restart.
+- Log out and clear the active session.
+- Switch accounts without exposing the previous account's data.
+- Handle invalid, expired or revoked sessions correctly.
+- Prevent authenticated screens from opening before session verification.
+- Provide loading, success, failure and retry states.
+- Support password reset only if a real configured identity service supports it.
+
+Never implement a fake login that accepts arbitrary credentials or treats any non-empty password as valid.
+
+For remote authentication, enforce authorization on the server, not merely in Android UI code. Each protected request must use the authenticated identity, and the backend must verify that identity before returning or modifying data.
+
+For a local-only application, use a proper account and credential design appropriate to the actual requirements. Clearly explain the security limitations of local-only authentication. Do not represent local PINs or locally stored passwords as equivalent to a secure remote identity provider.
+
+Store session secrets securely using an appropriate Android security mechanism. Never store plaintext passwords or log tokens.
+
+On logout, clear user-specific in-memory state and caches. Do not delete legitimate persistent account data merely to simulate logout.
+
+6. PHASE D — FIX THE DEFAULT DATA AND DATABASE PROBLEM
+
+Investigate why AI Studio preview data or default sample data appears after login.
+
+Search for:
+
+- Hardcoded sample lists and fake users.
+- Preview-only data providers.
+- Mock repositories accidentally enabled in production.
+- Default demo accounts.
+- Fake authentication services.
+- In-memory databases.
+- Shared singleton state.
+- Incorrect repository dependency injection.
+- Fallback data silently replacing failed database or network requests.
+- Incorrect local-storage keys.
+- Queries that do not filter by account.
+- Stale caches restored after account switching.
+- Seed callbacks or migrations that reinsert demo data.
+- A frontend that renders preview fixtures rather than the authenticated repository.
+
+Separate development fixtures from production data sources. Sample data must be available only in explicitly configured development or test environments. A production login must never silently fall back to fake preview data.
+
+Preserve intentional onboarding examples only if they are clearly identified, isolated and do not contain another user's private records.
+
+Database integrity requirements
+
+First identify the existing persistence model. Preserve it unless a change is justified by evidence.
+
+If Room is used:
+
+- Inspect entities, DAO queries, database version and schema history.
+- Verify generated code and schema exports.
+- Correct entity and query mismatches.
+- Review existing migrations.
+- Add migration tests for supported upgrade paths.
+- Regenerate schema artifacts using the project's configured KSP or KAPT process.
+- Commit the correct schema changes.
+- Never delete schemas or use destructive migration as a shortcut.
+- Preserve existing data during upgrades.
+
+If a remote database is used:
+
+- Inspect the real backend schema, migrations, authorization rules and deployment configuration.
+- Verify that the backend is reachable from the installed APK.
+- Ensure the mobile client does not connect to a development-only host.
+- Test server-side authorization for all account-owned records.
+
+If offline-first storage is intended, implement it consistently with the existing architecture. Define which source is authoritative and how synchronization and conflict handling work. Do not create a second database merely to hide existing persistence failures.
+
+7. PHASE E — STRICT MULTI-ACCOUNT DATA ISOLATION
+
+Every account-owned record must be associated with the correct authenticated owner, using the actual architecture's equivalent of an immutable owner ID.
+
+For remote data:
+
+- Enforce ownership on the server for every read, create, update and delete.
+- Do not trust an owner ID supplied by the client without validating it against the authenticated identity.
+- Protect file metadata, file contents, search, synchronization and background jobs.
+- Ensure direct object access cannot bypass ownership checks.
+
+For local data:
+
+- Scope repositories and queries to the active account.
+- Partition user-specific caches and preferences.
+- Clear in-memory state on account changes.
+- Ensure background tasks cannot write data into another account's namespace.
+- Use transactions where multiple related changes must be atomic.
+
+Implement automated tests with at least two independent accounts, Alice and Bob.
+
+Test these exact scenarios:
+
+1. Alice registers and creates a uniquely identifiable record.
+2. Alice logs out.
+3. Bob registers and logs in.
+4. Bob sees only Bob's records and receives a genuinely empty state if he has no records.
+5. Bob attempts to read, modify or delete Alice's record using its identifier.
+6. Every unauthorized operation is rejected.
+7. Alice logs back in and her original record remains intact.
+8. Restart the application and repeat the checks.
+9. Switch accounts repeatedly and confirm no stale UI state or cache leakage.
+10. Attempt access using an expired or invalid session.
+11. Confirm failed network requests do not expose demo data or cached data from a different account.
+12. If offline support exists, verify that offline data remains correctly partitioned and synchronization preserves ownership.
+
+Run authorization tests against the real backend where available. A client-only unit test is not sufficient evidence of server-side authorization.
+
+8. PHASE F — REPAIR ALL BUILD AND CI FAILURES
+
+Inspect the actual failing workflow logs and repair the causes rather than changing the pipeline to avoid them.
+
+Previously observed issues included:
+
+- Trailing spaces in DriveErrors.kt.
+- Detekt control-flow findings, including a function with too many return statements.
+- Unused declarations such as quotedValueStart and REASON_FIELD.
+- A formatting issue in Mappers.kt.
+- Four previously failing cloud unit tests.
+- Room schema drift and generated schema artifacts requiring review.
+- Failures in the cloud module's Detekt task.
+
+Treat these as historical leads, not proof that every issue still exists. Reproduce the current failures and verify each correction.
+
+Requirements:
+
+- Fix all genuine formatting and static-analysis findings.
+- Preserve correct parser behavior, especially for malformed and hostile input.
+- Remove unused code only after confirming it has no necessary effect.
+- Preserve or improve test coverage.
+- Correct flaky tests rather than retrying until they pass.
+- Review concurrency, quota limits and resource-release behavior where relevant to existing cloud tests.
+- Generate and review required Room schemas.
+- Fix Gradle dependency, configuration, compilation and test failures at their source.
+- Keep CI steps strict and meaningful.
+- Never remove required quality gates or mark failed tests as successful.
+
+Run the project's supported equivalents of:
+
+./gradlew --version
+./gradlew projects
+./gradlew test
+./gradlew assembleDebug
+./gradlew detekt
+./gradlew lintDebug
+
+Use the correct task names for the actual project. Some tasks may not exist or may have module-specific names. Discover those names rather than blindly assuming the commands are valid.
+
+Also run the relevant module-specific unit tests and migration tests. Use a clean build when appropriate.
+
+Fix any issues revealed by the tests and rerun the affected tests plus the complete release-verification suite.
+
+9. PHASE G — PROFESSIONAL UI/UX REDESIGN
+
+Only after the startup, data and authentication foundations are understood, improve the existing application interface without breaking functionality.
+
+First inspect the uploaded testing/design skill for its actual guidance. Use it as a quality reference, not as an excuse to ignore functional requirements.
+
+Design direction:
+
+- Premium, restrained, editorial-quality Android interface.
+- Intentional typography hierarchy and readable text.
+- Consistent spacing, alignment, corner radii and component sizing.
+- Refined color palette and accessible contrast.
+- A coherent icon system.
+- Professional login and registration screens.
+- Well-designed form validation and password visibility controls.
+- Clear navigation and meaningful page titles.
+- Responsive layouts for different Android screen sizes.
+- Proper light/dark theme behavior if supported by the existing app.
+- Purposeful loading indicators, skeletons where appropriate, empty states and error states.
+- Subtle, useful motion rather than excessive animation.
+- Appropriate touch targets and accessibility descriptions.
+- Clear destructive-action confirmations.
+- No clutter, random gradients, excessive glass effects, generic AI-generated dashboards or decorative elements that reduce usability.
+
+The result should look like a carefully art-directed product created by a skilled product designer, not a generic template.
+
+Login and onboarding
+
+Create a professional login experience with:
+
+- Clear application branding.
+- Email or username field appropriate to the actual identity system.
+- Secure password input and visibility toggle.
+- Appropriate validation and accessible error messages.
+- A clear primary login action.
+- Registration and password recovery only where supported.
+- Loading and disabled button states during authentication.
+- Clear feedback for invalid credentials, offline state and server errors.
+- No fake success state.
+
+Do not use a screenshot or static mockup as a replacement for the real login implementation.
+
+UI implementation constraints
+
+- Reuse the existing UI framework and component architecture.
+- Do not migrate from XML to Compose or vice versa without a demonstrated need.
+- Keep authentication, business logic and persistence out of presentation components.
+- Use existing design tokens or establish a consistent design system.
+- Test navigation and state transitions, not just visual appearance.
+- Avoid adding unnecessary dependencies.
+
+10. PHASE H — AUTOMATED TESTING AND REGRESSION PREVENTION
+
+Use my uploaded testing skill and implement the appropriate tests for this repository.
+
+Required coverage:
+
+Unit tests
+
+- Authentication validation and session handling.
+- Repository behavior.
+- Database queries and ownership filters.
+- Database migration behavior.
+- Error mapping and retry behavior.
+- Parsing and input validation.
+- Relevant cloud/quota/resource management logic.
+
+Integration tests
+
+- Registration/login to authenticated data loading.
+- Create/read/update/delete operations.
+- Database persistence after repository recreation and process restart where feasible.
+- Network error handling.
+- Account switching and cache invalidation.
+- Backend authorization, where a backend exists.
+
+Android UI tests
+
+- Launch app.
+- First screen renders.
+- Login success and failure.
+- Empty-state rendering.
+- Loading-to-success and loading-to-error transitions.
+- Navigation and logout.
+- Switching accounts.
+- Form validation and accessibility basics.
+
+Security and isolation tests
+
+- Cross-account read/write/delete attempts.
+- Invalid and expired sessions.
+- Missing or altered ownership identifiers.
+- No production fallback to preview data.
+- No sensitive credentials in logs.
+- Appropriate secure transport for remote services.
+
+Use deterministic test data, isolated fixtures and cleanup. Do not let tests depend on personal production accounts or real private user data.
+
+For UI automation, use the existing supported test framework and emulator/instrumentation setup. If no emulator is available, run what is possible and clearly identify what still requires a device.
+
+11. PHASE I — GITHUB ACTIONS AND APK ARTIFACT
+
+Inspect and repair the existing workflows. Keep the workflow structure understandable and avoid duplicating conflicting build pipelines.
+
+Create or correct a dependable workflow that:
+
+1. Checks out the intended commit.
+2. Configures the required JDK and Android SDK.
+3. Uses the committed Gradle wrapper.
+4. Builds and runs the required unit tests.
+5. Runs static analysis and lint.
+6. Runs database/schema verification where configured.
+7. Builds the debug APK.
+8. Verifies that the expected APK exists and is non-empty.
+9. Publishes the APK as a downloadable GitHub Actions artifact only after required checks pass.
+10. Reports failures with enough diagnostic information to identify the failing stage.
+
+Use correct artifact paths discovered from the actual modules and variants. Do not assume the output is always app/build/outputs/apk/debug/app-debug.apk.
+
+Keep secrets out of workflow logs. Do not require production signing credentials to generate a development debug APK.
+
+For the initial deliverable, prioritize an installable DEBUG APK. A signed release APK is a separate deliverable requiring an intentional signing and secret-management setup.
+
+Document how I can download the APK from the successful GitHub Actions run using a phone.
+
+12. PHASE J — PRODUCTION CONFIGURATION AND REAL-DEVICE READINESS
+
+Before calling the app usable, verify:
+
+- The correct application ID and launcher configuration.
+- Correct release/debug configuration separation.
+- Required permissions and network security settings.
+- Valid service endpoints for the installed APK.
+- No localhost-only production dependency.
+- No development-only mock services in the production variant.
+- Correct database initialization and migration behavior.
+- Appropriate error handling when offline.
+- No credentials committed to source control.
+- No debug-only shortcuts enabling authentication bypass.
+- Stable behavior after process death and restart.
+- Account isolation after logout and relogin.
+- APK compatibility with the intended Android device.
+
+If backend deployment is required, inspect whether a production backend already exists. If it does not, explicitly identify what must be deployed and configured. Do not pretend that adding an Android APK automatically deploys a server or cloud database.
+
+13. REQUIRED EXECUTION METHOD
+
+Work in these controlled stages:
+
+Stage 1: Source and workflow inspection.
+Stage 2: Root-cause report and repair plan.
+Stage 3: White-screen and startup fixes.
+Stage 4: Authentication and session fixes.
+Stage 5: Database persistence and account isolation.
+Stage 6: Unit, integration and regression tests.
+Stage 7: Gradle, Detekt, lint and GitHub Actions fixes.
+Stage 8: Professional UI/UX improvements.
+Stage 9: APK build, artifact validation and installation testing.
+Stage 10: Final evidence-based verification report.
+
+After each stage:
+
+- List the files changed.
+- Explain the verified issue and its correction.
+- Run the relevant tests.
+- Report the actual results.
+- Fix regressions before moving forward.
+
+If an early stage reveals that the presumed architecture is incorrect, adapt the plan based on source evidence.
+
+Do not stop after generating a plan if source-editing and test-execution tools are available. Proceed with the implementation. If a tool limitation prevents an operation, provide the exact commands or file changes required next.
+
+Do not overwrite production data, force-push, discard unrelated user changes or replace working architecture without a justified migration plan.
+
+14. DEFINITION OF DONE
+
+The task is complete only when evidence demonstrates the following:
+
+[ ] The app launches without a persistent white screen.
+[ ] Startup failures are visible and recoverable where possible.
+[ ] Real authentication works using the actual supported identity architecture.
+[ ] Invalid credentials are rejected.
+[ ] Sessions are restored and cleared correctly.
+[ ] User A cannot read, modify or delete User B's private data.
+[ ] Preview/mock data is not silently used in production.
+[ ] New accounts receive the correct empty state.
+[ ] User data persists after restart and relogin.
+[ ] Database migrations and generated schemas are consistent.
+[ ] Relevant unit and integration tests pass.
+[ ] Required Android UI tests pass where an execution environment is available.
+[ ] Detekt and lint pass without disabling required checks.
+[ ] The debug APK builds successfully.
+[ ] GitHub Actions publishes the expected APK artifact.
+[ ] The APK installs and launches on an Android device or emulator.
+[ ] Core authentication and persistence flows are verified on the installed build.
+[ ] The UI is polished, accessible and consistent.
+[ ] No known critical issue is concealed or falsely reported as fixed.
+
+Report any unverified items explicitly.
+
+15. FINAL REPORT FORMAT
+
+Provide:
+
+1. Executive summary.
+2. Actual architecture discovered.
+3. Root causes confirmed, with file paths and error evidence.
+4. Files changed and why.
+5. Authentication implementation and limitations.
+6. Database and migration changes.
+7. Account-isolation test results.
+8. UI/UX improvements.
+9. Exact Gradle commands run and their real results.
+10. CI run status and failure details, if any.
+11. APK artifact path and downloadable GitHub Actions location, if successfully produced.
+12. Device installation test results.
+13. Remaining blockers, environment limitations and next steps.
+
+Use a clear PASS / FAIL / NOT RUN status for each verification item.
+
+Never mark a test PASS because code looks correct. Never mark the app production-ready if authentication, authorization, persistence or installation remains unverified.
+
+BEGIN NOW: inspect the uploaded testing skill, the actual repository and the latest failing workflow. Diagnose before editing. Then carry out the repair in the order above, preserving existing functionality and proving each important fix with tests.
