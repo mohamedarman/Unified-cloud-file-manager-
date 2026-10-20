@@ -150,7 +150,8 @@ private fun createWebView(context: android.content.Context, onSetup: (WebView) -
                 return request?.url?.host != ASSET_DOMAIN
             }
             override fun shouldInterceptRequest(view: WebView?, request: WebResourceRequest?): WebResourceResponse? {
-                return assetLoader.shouldInterceptRequest(request?.url)
+                val url = request?.url ?: return null
+                return assetLoader.shouldInterceptRequest(url)
             }
         }
         onSetup(this)
