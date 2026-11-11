@@ -27,6 +27,7 @@ import { AccountStateMachine } from '../utils/accountStateMachine';
 import { globalQuotaGovernor } from '../utils/quotaGovernor';
 import { Redactor } from '../utils/redactor';
 import { useAuth } from './AuthContext';
+import { databaseService } from '../services/databaseService';
 
 export type NavigationTab =
   // Command Center
@@ -252,18 +253,38 @@ export const FileManagerProvider: React.FC<{ children: ReactNode }> = ({ childre
     safeGetItem(auditLogsKey, [])
   );
 
-  // When active user changes (login, signup, account switch), reload scoped state
+  // When active user changes (login, signup, account switch), reload scoped state and sync with Firestore
   useEffect(() => {
-    setAccounts(safeGetItem(accountsKey, defaultAccounts));
-    setFiles(safeGetItem(filesKey, defaultFiles));
+    const localAccs = safeGetItem(accountsKey, defaultAccounts);
+    const localFiles = safeGetItem(filesKey, defaultFiles);
+    const localQuotas = safeGetItem(quotasKey, defaultQuotas);
+
+    setAccounts(localAccs);
+    setFiles(localFiles);
     setCapabilities(safeGetItem(capabilitiesKey, defaultCapabilities));
-    setQuotas(safeGetItem(quotasKey, defaultQuotas));
+    setQuotas(localQuotas);
     setPendingOperations(safeGetItem(pendingOpsKey, []));
     setAuditLogs(safeGetItem(auditLogsKey, []));
     setCurrentFolderId(null);
     setFolderHistory([]);
     setSelectedFileKeys(new Set());
     setInspectedFile(null);
+
+    if (userId !== 'guest_user') {
+      void (async () => {
+        const remote = await databaseService.loadUserWorkspace();
+        if (remote) {
+          if (remote.accounts && remote.accounts.length > 0) setAccounts(remote.accounts);
+          if (remote.files && remote.files.length > 0) setFiles(remote.files);
+          if (remote.quotas && Object.keys(remote.quotas).length > 0) setQuotas(remote.quotas);
+          if (remote.operations && remote.operations.length > 0) setPendingOperations(remote.operations);
+          if (remote.auditLogs && remote.auditLogs.length > 0) setAuditLogs(remote.auditLogs);
+          if (!remote.accounts && localAccs.length > 0) {
+            await databaseService.seedWorkspaceIfEmpty(localAccs, localFiles, localQuotas);
+          }
+        }
+      })();
+    }
   }, [userId]);
 
   // Navigation and UI state
@@ -401,6 +422,7 @@ export const FileManagerProvider: React.FC<{ children: ReactNode }> = ({ childre
     };
 
     setAuditLogs((prev) => [entry, ...prev.slice(0, 99)]);
+    void databaseService.saveAuditLog(entry);
   };
 
   // Folder navigation
@@ -470,6 +492,14 @@ export const FileManagerProvider: React.FC<{ children: ReactNode }> = ({ childre
       lastVerifiedAt: Date.now(),
     };
 
+    const newQuota: QuotaUsage = {
+      providerId: provider,
+      accountId: newId,
+      usedBytes: 100 * 1024 * 1024,
+      limitBytes: providerMeta.defaultQuotaBytes,
+      manageUrl: providerMeta.manageUrl,
+    };
+
     setAccounts((prev) => [...prev, newAccount]);
 
     setCapabilities((prev) => ({
@@ -491,14 +521,10 @@ export const FileManagerProvider: React.FC<{ children: ReactNode }> = ({ childre
 
     setQuotas((prev) => ({
       ...prev,
-      [newId]: {
-        providerId: provider,
-        accountId: newId,
-        usedBytes: 100 * 1024 * 1024,
-        limitBytes: providerMeta.defaultQuotaBytes,
-        manageUrl: providerMeta.manageUrl,
-      },
+      [newId]: newQuota,
     }));
+
+    void databaseService.saveAccount(newAccount, newQuota);
 
     addAuditLog(
       newId,
@@ -529,6 +555,7 @@ export const FileManagerProvider: React.FC<{ children: ReactNode }> = ({ childre
       return next;
     });
     setAccounts((prev) => prev.filter((a) => a.localId !== accountId));
+    void databaseService.removeAccount(accountId);
 
     if (activeAccountId === accountId) {
       setActiveAccountId('ALL');
@@ -537,11 +564,12 @@ export const FileManagerProvider: React.FC<{ children: ReactNode }> = ({ childre
 
   const reconnectAccount = (accountId: LocalAccountId) => {
     setAccounts((prev) =>
-      prev.map((a) =>
-        a.localId === accountId
-          ? { ...a, state: AccountState.CONNECTED, lastVerifiedAt: Date.now() }
-          : a
-      )
+      prev.map((a) => {
+        if (a.localId !== accountId) return a;
+        const updated = { ...a, state: AccountState.CONNECTED, lastVerifiedAt: Date.now() };
+        void databaseService.saveAccount(updated);
+        return updated;
+      })
     );
     addAuditLog(accountId, 'ACCOUNT_REAUTH', `Reauthorization successful. State: CONNECTED.`);
   };
@@ -664,20 +692,26 @@ export const FileManagerProvider: React.FC<{ children: ReactNode }> = ({ childre
             previewText,
           };
 
+          const completedOp: PendingOperation = { ...newOp, state: 'COMPLETED' };
           setFiles((prev) => [newCloudFile, ...prev]);
           setPendingOperations((prev) =>
-            prev.map((op) => (op.id === opId ? { ...op, state: 'COMPLETED' } : op))
+            prev.map((op) => (op.id === opId ? completedOp : op))
           );
+
+          void databaseService.saveFile(newCloudFile);
+          void databaseService.saveOperation(completedOp);
 
           setQuotas((prev) => {
             const current = prev[accountId];
             if (!current) return prev;
+            const updatedQuota: QuotaUsage = {
+              ...current,
+              usedBytes: current.usedBytes + file.size,
+            };
+            void databaseService.saveQuota(updatedQuota);
             return {
               ...prev,
-              [accountId]: {
-                ...current,
-                usedBytes: current.usedBytes + file.size,
-              },
+              [accountId]: updatedQuota,
             };
           });
 
@@ -780,41 +814,44 @@ export const FileManagerProvider: React.FC<{ children: ReactNode }> = ({ childre
 
   const renameFile = (file: CloudFile, newName: string) => {
     const opId = Date.now();
-    setPendingOperations((prev) => [
-      {
-        id: opId,
-        accountId: file.ref.accountId,
-        operation: 'RENAME',
-        fileId: file.ref.fileId,
-        fileName: newName,
-        payload: JSON.stringify({ old: file.name, new: newName }),
-        state: 'COMPLETED',
-        createdAt: Date.now(),
-        lastAttemptAt: Date.now(),
-        attemptCount: 1,
-        outcomeUncertain: false,
-      },
-      ...prev,
-    ]);
+    const op: PendingOperation = {
+      id: opId,
+      accountId: file.ref.accountId,
+      operation: 'RENAME',
+      fileId: file.ref.fileId,
+      fileName: newName,
+      payload: JSON.stringify({ old: file.name, new: newName }),
+      state: 'COMPLETED',
+      createdAt: Date.now(),
+      lastAttemptAt: Date.now(),
+      attemptCount: 1,
+      outcomeUncertain: false,
+    };
+    setPendingOperations((prev) => [op, ...prev]);
 
+    const updatedFile: CloudFile = { ...file, name: newName };
     setFiles((prev) =>
-      prev.map((f) => (cacheKey(f.ref) === cacheKey(file.ref) ? { ...f, name: newName } : f))
+      prev.map((f) => (cacheKey(f.ref) === cacheKey(file.ref) ? updatedFile : f))
     );
 
     if (inspectedFile && cacheKey(inspectedFile.ref) === cacheKey(file.ref)) {
       setInspectedFile({ ...inspectedFile, name: newName });
     }
 
+    void databaseService.saveFile(updatedFile);
+    void databaseService.saveOperation(op);
     addAuditLog(file.ref.accountId, 'RENAME_FILE', `Renamed file to ${newName}`, file.ref.fileId);
   };
 
   const moveFile = (file: CloudFile, targetFolderId: string | null) => {
+    const updatedFile: CloudFile = { ...file, parentFolderId: targetFolderId };
     setFiles((prev) =>
       prev.map((f) =>
-        cacheKey(f.ref) === cacheKey(file.ref) ? { ...f, parentFolderId: targetFolderId } : f
+        cacheKey(f.ref) === cacheKey(file.ref) ? updatedFile : f
       )
     );
 
+    void databaseService.saveFile(updatedFile);
     addAuditLog(
       file.ref.accountId,
       'MOVE_FILE',
@@ -824,22 +861,26 @@ export const FileManagerProvider: React.FC<{ children: ReactNode }> = ({ childre
   };
 
   const trashFile = (file: CloudFile) => {
+    const updatedFile: CloudFile = { ...file, isTrashed: true };
     setFiles((prev) =>
-      prev.map((f) => (cacheKey(f.ref) === cacheKey(file.ref) ? { ...f, isTrashed: true } : f))
+      prev.map((f) => (cacheKey(f.ref) === cacheKey(file.ref) ? updatedFile : f))
     );
     if (inspectedFile && cacheKey(inspectedFile.ref) === cacheKey(file.ref)) {
       setInspectedFile({ ...inspectedFile, isTrashed: true });
     }
+    void databaseService.saveFile(updatedFile);
     addAuditLog(file.ref.accountId, 'TRASH_FILE', `Moved file to Trash`, file.ref.fileId);
   };
 
   const restoreFile = (file: CloudFile) => {
+    const updatedFile: CloudFile = { ...file, isTrashed: false };
     setFiles((prev) =>
-      prev.map((f) => (cacheKey(f.ref) === cacheKey(file.ref) ? { ...f, isTrashed: false } : f))
+      prev.map((f) => (cacheKey(f.ref) === cacheKey(file.ref) ? updatedFile : f))
     );
     if (inspectedFile && cacheKey(inspectedFile.ref) === cacheKey(file.ref)) {
       setInspectedFile({ ...inspectedFile, isTrashed: false });
     }
+    void databaseService.saveFile(updatedFile);
     addAuditLog(file.ref.accountId, 'RESTORE_FILE', `Restored file from Trash`, file.ref.fileId);
   };
 
@@ -848,6 +889,7 @@ export const FileManagerProvider: React.FC<{ children: ReactNode }> = ({ childre
     if (inspectedFile && cacheKey(inspectedFile.ref) === cacheKey(file.ref)) {
       setInspectedFile(null);
     }
+    void databaseService.removeFile(file);
     addAuditLog(
       file.ref.accountId,
       'PERMANENT_DELETE',
@@ -859,14 +901,16 @@ export const FileManagerProvider: React.FC<{ children: ReactNode }> = ({ childre
 
   const toggleStar = (file: CloudFile) => {
     const nextStarred = !file.isStarred;
+    const updatedFile: CloudFile = { ...file, isStarred: nextStarred };
     setFiles((prev) =>
       prev.map((f) =>
-        cacheKey(f.ref) === cacheKey(file.ref) ? { ...f, isStarred: nextStarred } : f
+        cacheKey(f.ref) === cacheKey(file.ref) ? updatedFile : f
       )
     );
     if (inspectedFile && cacheKey(inspectedFile.ref) === cacheKey(file.ref)) {
       setInspectedFile({ ...inspectedFile, isStarred: nextStarred });
     }
+    void databaseService.saveFile(updatedFile);
     addAuditLog(
       file.ref.accountId,
       'STAR_FILE',
@@ -895,6 +939,7 @@ export const FileManagerProvider: React.FC<{ children: ReactNode }> = ({ childre
     };
 
     setFiles((prev) => [newFolder, ...prev]);
+    void databaseService.saveFile(newFolder);
     addAuditLog(accountId, 'CREATE_FOLDER', `Created folder "${name}" in ${account.badgeLabel}`, folderId);
   };
 

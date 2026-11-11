@@ -1,0 +1,27 @@
+{
+  "id": "/",
+  "name": "Unified Cloud File Manager",
+  "short_name": "MultiCloud",
+  "description": "A mobile-first unified interface for managing authorized files across multiple Google Accounts, OneDrive, Dropbox, and Box without providing or bypassing additional storage.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f8fafc",
+  "theme_color": "#1a73e8",
+  "categories": ["productivity", "utilities"],
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

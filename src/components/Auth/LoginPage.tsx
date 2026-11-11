@@ -152,9 +152,9 @@ export const LoginPage: React.FC = () => {
             </p>
           </div>
 
-          {error && (
+          {(error || sessionError) && (
             <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs">
-              {error}
+              {error || sessionError}
             </div>
           )}
 
@@ -187,6 +187,48 @@ export const LoginPage: React.FC = () => {
               <span>Continue with Google</span>
             </button>
           </div>
+
+          {/* Quick Vault Account Sign-In for Owner & Enterprise Demo */}
+          {mode === 'signin' && availableUsers.length > 0 && (
+            <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+                  Quick Vault Access
+                </span>
+                <span className="text-[10px] text-blue-600 font-medium">
+                  1-Click Sign In
+                </span>
+              </div>
+              <div className="grid grid-cols-1 gap-1.5">
+                {availableUsers.slice(0, 2).map((u) => (
+                  <button
+                    key={u.id}
+                    type="button"
+                    disabled={isLoading}
+                    onClick={async () => {
+                      clearSessionError();
+                      setError(null);
+                      setIsLoading(true);
+                      try {
+                        await loginWithGoogle(u.email, u.name);
+                      } catch (e: unknown) {
+                        setError(e instanceof Error ? e.message : 'Quick sign-in failed');
+                      } finally {
+                        setIsLoading(false);
+                      }
+                    }}
+                    className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-white hover:bg-blue-50/60 border border-slate-200 hover:border-blue-300 text-left transition cursor-pointer"
+                  >
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold text-slate-800 truncate">{u.name}</p>
+                      <p className="text-[10px] text-slate-500 truncate">{u.email}</p>
+                    </div>
+                    <ArrowRight className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Divider */}
           <div className="relative flex items-center justify-center">
@@ -343,7 +385,7 @@ export const LoginPage: React.FC = () => {
           </button>
         </div>
         <p className="text-[10px] text-slate-400">
-          Unified Cloud File Manager does not create, pool, or bypass cloud storage limits. Storage remains owned, metered, and enforced directly by each respective provider.
+          Unified Cloud File Manager does not create, aggregate, or modify cloud storage limits. Storage remains owned, metered, and enforced directly by each respective provider.
         </p>
       </footer>
 
@@ -359,7 +401,7 @@ export const LoginPage: React.FC = () => {
           >
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <h3 className="font-bold text-slate-900 text-base">
-                {legalModal === 'privacy' ? 'Privacy Policy' : 'Terms of Service'}
+                {legalModal === 'privacy' ? 'Privacy Policy & Data Protection' : 'Terms of Service & API Compliance'}
               </h3>
               <button
                 onClick={() => setLegalModal(null)}
@@ -374,25 +416,28 @@ export const LoginPage: React.FC = () => {
               {legalModal === 'privacy' ? (
                 <>
                   <p>
-                    <strong>Data Processing Invariants:</strong> Unified Cloud File Manager processes OAuth credentials and directory metadata strictly within your local browser storage. No user file contents are stored or inspected on central application servers.
+                    <strong>1. Data Processing Invariants:</strong> Unified Cloud File Manager processes OAuth 2.0 PKCE credentials and directory metadata strictly for client-side file management. No raw user file contents are inspected, sold, or used for advertising or AI model training.
                   </p>
                   <p>
-                    <strong>Google Limited Use Compliance:</strong> Use of information received from Google APIs strictly adheres to the Google API Services User Data Policy, including the Limited Use requirements.
+                    <strong>2. Google API Services User Data Policy (Limited Use):</strong> The application's use and transfer to any other app of information received from Google APIs adheres strictly to the Google API Services User Data Policy, including the Limited Use requirements.
                   </p>
                   <p>
-                    <strong>Multi-Account Isolation:</strong> All connected accounts remain isolated with separate encryption keys and local account identifiers.
+                    <strong>3. Multi-Account Cryptographic Isolation:</strong> All connected cloud accounts remain strictly isolated via composite keys (<code>provider:accountId:fileId</code>) and separate hardware-backed Android Keystore / WebCrypto session keys.
+                  </p>
+                  <p>
+                    <strong>4. Telemetry Redaction & GDPR/CCPA Rights:</strong> Diagnostic logs pass through a deterministic PII redactor that scrubs OAuth bearer tokens, emails, and file paths. Users can revoke OAuth tokens and purge all local and cloud-synced metadata at any time.
                   </p>
                 </>
               ) : (
                 <>
                   <p>
-                    <strong>Authorized Use:</strong> You certify that you are authorized to access any connected cloud accounts. You remain bound by each provider's acceptable use policies.
+                    <strong>1. Authorized Account Access:</strong> You certify that you are the authorized holder of any Google Drive, Microsoft OneDrive, Dropbox, or Box account you connect, and you remain bound by each provider's Terms of Service.
                   </p>
                   <p>
-                    <strong>Non-Storage Entity:</strong> The application does not provide or sell storage capacity; it is an orchestration interface.
+                    <strong>2. Independent Per-Account Storage Quotas:</strong> This application is a multi-account file browser and orchestration client. It does not sell storage capacity or alter provider quota boundaries; every connected account is governed independently by its upstream cloud provider.
                   </p>
                   <p>
-                    <strong>Disclaimer:</strong> The software is provided "as-is" without warranty. Cloud availability and rate limits depend on third-party provider APIs.
+                    <strong>3. Rate-Limit Governance:</strong> All API operations are regulated by a client-side token-bucket Quota Governor that respects HTTP 429 and 5xx Retry-After headers.
                   </p>
                 </>
               )}

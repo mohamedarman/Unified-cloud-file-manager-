@@ -102,25 +102,48 @@ export const ViewRouter: React.FC<ViewRouterProps> = ({
         return <GalleryView />;
       case 'search':
         return <CrossAccountSearchView onOpenDetails={onOpenDetails} />;
+      case 'accounts':
+        return <AccountsCenterView onOpenAddAccount={onOpenAddAccount} />;
       case 'quotas':
         return <QuotaGovernorView />;
+      case 'operations':
+        return <PendingOperationsView />;
+      case 'offline':
+        return <OfflineFilesView onOpenDetails={onOpenDetails} />;
+      case 'security':
+      case 'security_policies':
+        return <SecurityAuditView />;
+      case 'dashboard':
+        return <MultiCloudDashboardView />;
+      case 'infra_overview':
+      case 'infra_compute':
+      case 'infra_storage':
+      case 'infra_databases':
+      case 'infra_networks':
+      case 'infra_k8s':
+        return <InfrastructureOverviewView />;
+      case 'infra_topology':
+        return <TopologyView />;
+      case 'providers':
+        return <CloudProvidersView />;
+      case 'monitoring_metrics':
+      case 'monitoring_logs':
+      case 'monitoring_alerts':
+      case 'monitoring_events':
+        return <ObservabilityView />;
+      case 'cost_overview':
+      case 'cost_optimization':
+        return <CostManagementView />;
+      case 'automation_workflows':
+        return <AutomationView />;
       case 'settings':
-      case 'accounts':
         return <SettingsView />;
       case 'legal':
         return <LegalComplianceView />;
       case 'help':
         return <HelpSupportView />;
       default:
-        return (
-          <FileBrowser
-            onOpenUpload={onOpenUpload}
-            onOpenNewFolder={onOpenNewFolder}
-            onOpenDetails={onOpenDetails}
-            onOpenQuickLook={onOpenQuickLook}
-            onOpenMove={onOpenMove}
-          />
-        );
+        return <NotFoundView />;
     }
   };
 
@@ -132,3 +155,4 @@ export const ViewRouter: React.FC<ViewRouterProps> = ({
     </ErrorBoundary>
   );
 };
+

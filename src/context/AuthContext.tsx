@@ -10,6 +10,7 @@ import {
   User 
 } from 'firebase/auth';
 import { authService, AuthUser, AuthSession } from '../services/authService';
+import { databaseService } from '../services/databaseService';
 
 export type { AuthUser, AuthSession };
 
@@ -47,7 +48,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   }, []);
 
-  // Restore session on mount
+  // Restore session on mount and listen to Firebase Auth state changes
   useEffect(() => {
     let isMounted = true;
 
@@ -62,8 +63,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           setUser(active.user);
           setSession(active.session);
           setSessionError(null);
+          void databaseService.syncUserProfile(active.user);
         } else {
-          // If a session token was previously saved but is now invalid/expired
           const rawSession = localStorage.getItem('ucfm_active_session_v1');
           if (rawSession) {
             setSessionError('Your security session has expired. Please sign in again.');
@@ -87,33 +88,80 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       }
     };
 
-    restoreSession();
+    void restoreSession();
 
-    // Listen to storage events across tabs
+    const unsubscribeFirebase = onAuthStateChanged(firebaseAuth, async (fbUser: User | null) => {
+      if (!isMounted || !fbUser) return;
+      try {
+        const currentActive = await authService.validateSession();
+        if (!currentActive && fbUser.email) {
+          const res = await authService.authenticateWithGoogle(
+            fbUser.email,
+            fbUser.displayName || undefined
+          );
+          if (isMounted) {
+            setUser(res.user);
+            setSession(res.session);
+            setSessionError(null);
+            refreshAvailableUsers();
+            void databaseService.syncUserProfile(res.user);
+          }
+        }
+      } catch (e) {
+        console.warn('Firebase auth state sync warning:', e);
+      }
+    });
+
     const handleStorageChange = (e: StorageEvent) => {
       if (e.key === 'ucfm_active_session_v1' || e.key === 'ucfm_auth_user') {
-        restoreSession();
+        void restoreSession();
       }
     };
     window.addEventListener('storage', handleStorageChange);
 
     return () => {
       isMounted = false;
+      unsubscribeFirebase();
       window.removeEventListener('storage', handleStorageChange);
     };
   }, [refreshAvailableUsers]);
 
-  const loginWithGoogle = async (): Promise<void> => {
+  const loginWithGoogle = async (email?: string, name?: string): Promise<void> => {
     setSessionError(null);
-    const provider = new GoogleAuthProvider();
     try {
-      const result = await signInWithPopup(firebaseAuth, provider);
-      const user = result.user;
-      // You can now use user.uid to link to your firestore records
-      // and authenticate via authService to keep local session state consistent
-      await authService.authenticateWithGoogle(user.email || undefined, user.displayName || undefined);
-    } catch (err) {
-      setSessionError('Google Sign-In failed.');
+      let resolvedEmail = email;
+      let resolvedName = name;
+
+      // Attempt Firebase Google popup when no explicit email is passed and not restricted by WebView
+      const isAndroidWebView =
+        typeof window !== 'undefined' &&
+        (window.location.hostname === 'appassets.androidplatform.net' ||
+          /wv|Version\/\d+\.\d+.*Chrome/.test(navigator.userAgent));
+
+      if (!resolvedEmail && !isAndroidWebView) {
+        try {
+          const provider = new GoogleAuthProvider();
+          const result = await signInWithPopup(firebaseAuth, provider);
+          resolvedEmail = result.user.email || undefined;
+          resolvedName = result.user.displayName || undefined;
+        } catch (popupErr: unknown) {
+          const code = (popupErr as { code?: string })?.code || '';
+          if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request') {
+            throw new Error('Google Sign-In popup was closed before completing authentication.');
+          }
+          // For WebView / unauthorized-domain / environment restrictions, fall back to local Google OAuth vault
+          console.warn('Firebase popup unavailable in this environment, using local Google session vault:', code);
+        }
+      }
+
+      const res = await authService.authenticateWithGoogle(resolvedEmail, resolvedName);
+      setUser(res.user);
+      setSession(res.session);
+      refreshAvailableUsers();
+      void databaseService.syncUserProfile(res.user);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Google Sign-In failed.';
+      setSessionError(msg);
       throw err;
     }
   };
@@ -121,10 +169,38 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const loginWithEmail = async (email: string, password: string): Promise<void> => {
     setSessionError(null);
     try {
-      await signInWithEmailAndPassword(firebaseAuth, email, password);
-      await authService.authenticate(email, password);
-    } catch (err) {
-      setSessionError('Email login failed.');
+      // Authenticate against cryptographic local vault first (supports pre-seeded owner & enterprise accounts + registered users)
+      let res: { user: AuthUser; session: AuthSession };
+      try {
+        res = await authService.authenticate(email, password);
+      } catch (vaultErr) {
+        // If user exists in Firebase Auth from another device, verify with Firebase Auth and register locally
+        const fbCred = await signInWithEmailAndPassword(firebaseAuth, email, password);
+        res = await authService.authenticateWithGoogle(
+          fbCred.user.email || email,
+          fbCred.user.displayName || email.split('@')[0]
+        );
+        void vaultErr;
+      }
+
+      // Best-effort Firebase Auth session synchronization for Firestore rules
+      try {
+        await signInWithEmailAndPassword(firebaseAuth, email, password);
+      } catch {
+        try {
+          await createUserWithEmailAndPassword(firebaseAuth, email, password);
+        } catch {
+          // Ignore if offline or email already linked to Google provider
+        }
+      }
+
+      setUser(res.user);
+      setSession(res.session);
+      refreshAvailableUsers();
+      void databaseService.syncUserProfile(res.user);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Email login failed.';
+      setSessionError(msg);
       throw err;
     }
   };
@@ -132,10 +208,22 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const signupWithEmail = async (email: string, password: string, name: string): Promise<void> => {
     setSessionError(null);
     try {
-      await createUserWithEmailAndPassword(firebaseAuth, email, password);
-      await authService.register(email, password, name);
-    } catch (err) {
-      setSessionError('Signup failed.');
+      const res = await authService.register(email, password, name);
+
+      // Best-effort Firebase Auth user creation for Firestore sync
+      try {
+        await createUserWithEmailAndPassword(firebaseAuth, email, password);
+      } catch {
+        // Ignore if offline or restricted in Android WebView
+      }
+
+      setUser(res.user);
+      setSession(res.session);
+      refreshAvailableUsers();
+      void databaseService.syncUserProfile(res.user);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Signup failed.';
+      setSessionError(msg);
       throw err;
     }
   };
@@ -146,18 +234,18 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setUser(result.user);
     setSession(result.session);
     refreshAvailableUsers();
+    void databaseService.syncUserProfile(result.user);
   };
 
   const logout = async () => {
     try {
-      await signOut(firebaseAuth);
+      await signOut(firebaseAuth).catch(() => undefined);
+    } finally {
       authService.logout();
       setUser(null);
       setSession(null);
       setSessionError(null);
       refreshAvailableUsers();
-    } catch (err) {
-      console.error('Logout failed:', err);
     }
   };
 

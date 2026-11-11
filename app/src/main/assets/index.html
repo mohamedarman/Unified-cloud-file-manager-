@@ -1,39 +1,105 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Unified Cloud File Manager</title>
-    <style>
-      body {
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-        background-color: #0f172a;
-        color: #f8fafc;
-        margin: 0;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        min-height: 100vh;
-        text-align: center;
-        padding: 20px;
+    
+    <!-- Primary Page Titles & Identity -->
+    <title>Unified Cloud File Manager – Multi-Cloud Workspace</title>
+    <meta
+      name="description"
+      content="Unified interface for managing authorized files across Google Drive, Microsoft OneDrive, Dropbox, and Box with multi-account isolation, gallery view, cross-cloud search, and offline operation queue."
+    />
+    <link rel="canonical" href="https://unified-cloud-file-manager.app/" />
+    <meta name="robots" content="index, follow" />
+    <meta name="author" content="Unified Cloud File Manager" />
+    <meta name="keywords" content="cloud file manager, Google Drive, OneDrive, Dropbox, Box, multi-account isolation, cross-cloud search, quota governance" />
+
+    <!-- Security & Protocol Hygiene -->
+    <meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests" />
+    <meta name="referrer" content="strict-origin-when-cross-origin" />
+
+    <!-- OpenGraph Social Cards -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Unified Cloud File Manager" />
+    <meta property="og:title" content="Unified Cloud File Manager – Multi-Cloud Workspace" />
+    <meta
+      property="og:description"
+      content="Unified interface for managing authorized files across Google Drive, Microsoft OneDrive, Dropbox, and Box with multi-account isolation, gallery view, cross-cloud search, and offline operation queue."
+    />
+    <meta property="og:url" content="https://unified-cloud-file-manager.app/" />
+    <meta property="og:image" content="./og-image.svg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:type" content="image/svg+xml" />
+    <meta property="og:image:alt" content="Unified Cloud File Manager Workspace Preview" />
+
+    <!-- Twitter / X Cards -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Unified Cloud File Manager – Multi-Cloud Workspace" />
+    <meta
+      name="twitter:description"
+      content="Unified interface for managing authorized files across Google Drive, Microsoft OneDrive, Dropbox, and Box with multi-account isolation, gallery view, cross-cloud search, and offline operation queue."
+    />
+    <meta name="twitter:image" content="./og-image.svg" />
+    
+    <!-- Favicon & PWA App Icons -->
+    <link rel="icon" type="image/svg+xml" href="./icon.svg" />
+    <link rel="apple-touch-icon" href="./icon.svg" />
+    <link rel="manifest" href="./manifest.json" />
+    <meta name="theme-color" content="#1a73e8" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="MultiCloud" />
+    
+    <!-- Typography -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+
+    <!-- Schema.org Structured Data (JSON-LD) -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      "name": "Unified Cloud File Manager",
+      "applicationCategory": "BusinessApplication, ProductivityApplication",
+      "operatingSystem": "All",
+      "browserRequirements": "Requires JavaScript. Requires HTML5.",
+      "description": "A client-side unified interface for managing authorized files across Google Drive, OneDrive, Dropbox, and Box accounts with strict multi-account isolation, quota governance, and offline operations.",
+      "url": "https://unified-cloud-file-manager.app/",
+      "featureList": [
+        "Multi-Account Isolation",
+        "Cross-Cloud Search",
+        "Quota Governance",
+        "Offline Operation Queue",
+        "Media Gallery Preview",
+        "Zero-Storage Footprint"
+      ],
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "USD"
       }
-      .card {
-        background: #1e293b;
-        border-radius: 16px;
-        padding: 32px;
-        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
-        max-width: 400px;
-        width: 100%;
-      }
-      h1 { font-size: 1.5rem; margin-bottom: 12px; color: #38bdf8; }
-      p { font-size: 0.95rem; color: #94a3b8; line-height: 1.5; }
-    </style>
+    }
+    </script>
+    <script type="module" crossorigin src="./assets/index-2rEoSxCo.js"></script>
+    <link rel="modulepreload" crossorigin href="./assets/vendor-icons-kB6Cm8Qq.js">
+    <link rel="modulepreload" crossorigin href="./assets/vendor-charts-DGqG9cW0.js">
+    <link rel="stylesheet" crossorigin href="./assets/index-CoGEyk_F.css">
   </head>
-  <body>
-    <div class="card">
-      <h1>Unified Cloud File Manager</h1>
-      <p>Mobile workspace environment active.</p>
+  <body class="bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-sans antialiased selection:bg-blue-500 selection:text-white min-h-screen">
+    <div id="root">
+      <div style="min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; background-color: #0f172a; color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; text-align: center; padding: 24px;">
+        <div style="width: 48px; height: 48px; border: 3px solid rgba(56, 189, 248, 0.2); border-top-color: #38bdf8; border-radius: 50%; animation: ucfm-spin 0.9s linear infinite; margin-bottom: 20px;"></div>
+        <div style="font-weight: 700; font-size: 1.25rem; letter-spacing: -0.02em; color: #38bdf8; margin-bottom: 8px;">Unified Cloud File Manager</div>
+        <div style="font-size: 0.9rem; color: #94a3b8; max-width: 280px; line-height: 1.5;">Initializing multi-cloud workspace and secure storage...</div>
+        <noscript>
+          <div style="margin-top: 16px; color: #ef4444; font-size: 0.85rem;">JavaScript is required to run Unified Cloud File Manager.</div>
+        </noscript>
+        <style>@keyframes ucfm-spin { to { transform: rotate(360deg); } }</style>
+      </div>
     </div>
   </body>
 </html>

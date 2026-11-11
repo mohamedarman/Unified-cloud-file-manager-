@@ -1,21 +1,124 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Helper functions
-    function isSignedIn() { return request.auth != null; }
-    function isOwner(userId) { return isSignedIn() && request.auth.uid == userId; }
-
-    // Master Gate
-    match /{document=**} {
-      allow read, write: if false;
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    function isAuthenticated() {
+      return request.auth != null;
     }
 
-    // Account data access control
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        request.auth.token.email == "mohamedarman536@gmail.com" &&
+        request.auth.token.email_verified == true;
+    }
+
+    function isValidUserProfile(data) {
+      return data.uid is string && data.uid.size() > 0 && data.uid.size() <= 128 &&
+        data.email is string && data.email.size() > 3 && data.email.size() <= 254 &&
+        data.displayName is string && data.displayName.size() > 0 && data.displayName.size() <= 120;
+    }
+
+    function isValidAccount(data) {
+      return data.localId is number &&
+        data.provider in ['GOOGLE_DRIVE', 'ONE_DRIVE', 'DROPBOX', 'BOX'] &&
+        data.displayEmail is string && data.displayEmail.size() <= 254 &&
+        data.displayName is string && data.displayName.size() <= 120 &&
+        data.state is string && data.state.size() <= 40;
+    }
+
+    function isValidCloudFile(data) {
+      return data.ref is map &&
+        data.ref.provider in ['GOOGLE_DRIVE', 'ONE_DRIVE', 'DROPBOX', 'BOX'] &&
+        data.ref.accountId is number &&
+        data.ref.fileId is string && data.ref.fileId.size() <= 256 &&
+        data.name is string && data.name.size() > 0 && data.name.size() <= 512 &&
+        data.mimeType is string && data.mimeType.size() <= 256 &&
+        data.modifiedTimeMillis is number &&
+        data.isFolder is bool;
+    }
+
+    function isValidQuota(data) {
+      return data.providerId in ['GOOGLE_DRIVE', 'ONE_DRIVE', 'DROPBOX', 'BOX'] &&
+        data.accountId is number &&
+        data.usedBytes is number && data.usedBytes >= 0;
+    }
+
+    function isValidOperation(data) {
+      return data.id is number &&
+        data.accountId is number &&
+        data.operation is string && data.operation.size() <= 64 &&
+        data.fileId is string && data.fileId.size() <= 256 &&
+        data.state is string && data.state.size() <= 32 &&
+        data.createdAt is number;
+    }
+
+    function isValidAuditLog(data) {
+      return data.id is string && data.id.size() <= 128 &&
+        data.timestamp is number &&
+        data.accountId is number &&
+        data.action is string && data.action.size() <= 128 &&
+        data.redactedMessage is string && data.redactedMessage.size() <= 2048 &&
+        data.severity in ['INFO', 'WARN', 'ERROR'];
+    }
+
+    // ===============================================================
+    // Connection Health Probe (Read-Only)
+    // ===============================================================
+    match /connection_test/{docId} {
+      allow get: if true;
+      allow list, write: if false;
+    }
+
+    // ===============================================================
+    // User Workspace & Isolated Multi-Account Subcollections
+    // ===============================================================
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create, update: if isOwner(userId) && isValidUserProfile(request.resource.data);
+      allow delete: if isOwner(userId) || isAdmin();
+
+      match /accounts/{accountId} {
+        allow read: if isOwner(userId) || isAdmin();
+        allow create, update: if isOwner(userId) && isValidAccount(request.resource.data);
+        allow delete: if isOwner(userId) || isAdmin();
+      }
+
+      match /files/{fileId} {
+        allow read: if isOwner(userId) || isAdmin();
+        allow create, update: if isOwner(userId) && isValidCloudFile(request.resource.data);
+        allow delete: if isOwner(userId) || isAdmin();
+      }
+
+      match /quotas/{accountId} {
+        allow read: if isOwner(userId) || isAdmin();
+        allow create, update: if isOwner(userId) && isValidQuota(request.resource.data);
+        allow delete: if isOwner(userId) || isAdmin();
+      }
+
+      match /operations/{opId} {
+        allow read: if isOwner(userId) || isAdmin();
+        allow create, update: if isOwner(userId) && isValidOperation(request.resource.data);
+        allow delete: if isOwner(userId) || isAdmin();
+      }
+
+      match /auditLogs/{logId} {
+        allow read: if isOwner(userId) || isAdmin();
+        allow create, update: if isOwner(userId) && isValidAuditLog(request.resource.data);
+        allow delete: if isOwner(userId) || isAdmin();
+      }
+    }
+
+    // Legacy path compatibility
     match /accounts/{userId}/{account=**} {
       allow read, write: if isOwner(userId);
     }
-    
-    // File metadata access control
+
     match /files/{userId}/{file=**} {
       allow read, write: if isOwner(userId);
     }

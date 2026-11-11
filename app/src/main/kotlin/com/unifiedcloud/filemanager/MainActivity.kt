@@ -1,6 +1,8 @@
 package com.unifiedcloud.filemanager
 
 import android.annotation.SuppressLint
+import android.content.Context
+import android.graphics.Color as AndroidColor
 import android.os.Bundle
 import android.util.Log
 import android.webkit.ConsoleMessage
@@ -64,6 +66,7 @@ private const val TAG = "UnifiedCloudWebView"
 
 // Constants for styling and configuration
 private const val BACKGROUND_COLOR_HEX = 0xFF0F172A
+private const val BACKGROUND_COLOR_STRING = "#0F172A"
 private const val PROGRESS_INDICATOR_SIZE = 44
 private const val STROKE_WIDTH = 3
 private const val ERROR_TEXT_COLOR = 0xFFF87171
@@ -78,6 +81,7 @@ private const val SPACING_SMALL = 8
 private const val SPACING_MEDIUM = 16
 private const val SPACING_LARGE = 20
 private const val PADDING_DEFAULT = 24
+private const val UNKNOWN_HTTP_STATUS = -1
 
 @SuppressLint("SetJavaScriptEnabled")
 @Suppress("FunctionName", "ktlint:standard:function-naming")
@@ -96,16 +100,15 @@ fun AppWebView() {
         AndroidView(
             modifier = Modifier.fillMaxSize(),
             factory = { context ->
-                createWebView(context) { webView ->
+                createWebView(
+                    context = context,
+                    onFinished = { isLoading = false },
+                    onError = { error ->
+                        loadError = error
+                        isLoading = false
+                    },
+                ).also { webView ->
                     webViewInstance = webView
-                    webView.webChromeClient = createWebChromeClient()
-                    webView.webViewClient = createWebViewClient(
-                        onFinished = { isLoading = false },
-                        onError = { error ->
-                            loadError = error
-                            isLoading = false
-                        }
-                    )
                     webView.loadUrl(APP_URL)
                 }
             },
@@ -125,14 +128,21 @@ fun AppWebView() {
     }
 }
 
-private fun createWebView(context: android.content.Context, onSetup: (WebView) -> Unit): WebView {
-    val assetLoader = WebViewAssetLoader.Builder()
-        .setDomain(ASSET_DOMAIN)
-        .addPathHandler("/assets/", WebViewAssetLoader.AssetsPathHandler(context))
-        .build()
+@SuppressLint("SetJavaScriptEnabled")
+private fun createWebView(
+    context: Context,
+    onFinished: () -> Unit,
+    onError: (String) -> Unit,
+): WebView {
+    val assetLoader =
+        WebViewAssetLoader
+            .Builder()
+            .setDomain(ASSET_DOMAIN)
+            .addPathHandler("/assets/", WebViewAssetLoader.AssetsPathHandler(context))
+            .build()
 
     return WebView(context).apply {
-        setBackgroundColor(android.graphics.Color.parseColor("#0F172A"))
+        setBackgroundColor(AndroidColor.parseColor(BACKGROUND_COLOR_STRING))
         settings.apply {
             javaScriptEnabled = true
             domStorageEnabled = true
@@ -145,56 +155,80 @@ private fun createWebView(context: android.content.Context, onSetup: (WebView) -
             setSupportZoom(false)
             cacheMode = WebSettings.LOAD_DEFAULT
         }
-        webViewClient = object : WebViewClient() {
-            override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
-                return request?.url?.host != ASSET_DOMAIN
-            }
-            override fun shouldInterceptRequest(view: WebView?, request: WebResourceRequest?): WebResourceResponse? {
-                val url = request?.url ?: return null
-                return assetLoader.shouldInterceptRequest(url)
-            }
-        }
-        onSetup(this)
+        webChromeClient = createWebChromeClient()
+        webViewClient = createWebViewClient(assetLoader, onFinished, onError)
     }
 }
 
-private fun createWebChromeClient() = object : WebChromeClient() {
-    override fun onConsoleMessage(consoleMessage: ConsoleMessage?): Boolean {
-        consoleMessage?.let {
-            val logMsg = "[${it.sourceId()}:${it.lineNumber()}] ${it.message()}"
-            when (it.messageLevel()) {
-                ConsoleMessage.MessageLevel.ERROR -> Log.e(TAG, logMsg)
-                ConsoleMessage.MessageLevel.WARNING -> Log.w(TAG, logMsg)
-                else -> Log.d(TAG, logMsg)
+private fun createWebChromeClient() =
+    object : WebChromeClient() {
+        override fun onConsoleMessage(consoleMessage: ConsoleMessage?): Boolean {
+            consoleMessage?.let {
+                val logMsg = "[${it.sourceId()}:${it.lineNumber()}] ${it.message()}"
+                when (it.messageLevel()) {
+                    ConsoleMessage.MessageLevel.ERROR -> Log.e(TAG, logMsg)
+                    ConsoleMessage.MessageLevel.WARNING -> Log.w(TAG, logMsg)
+                    else -> Log.d(TAG, logMsg)
+                }
             }
+            return true
         }
-        return true
     }
-}
 
-private fun createWebViewClient(onFinished: () -> Unit, onError: (String) -> Unit) = object : WebViewClient() {
-    override fun onPageFinished(view: WebView?, url: String?) {
+private fun createWebViewClient(
+    assetLoader: WebViewAssetLoader,
+    onFinished: () -> Unit,
+    onError: (String) -> Unit,
+) = object : WebViewClient() {
+    override fun shouldOverrideUrlLoading(
+        view: WebView?,
+        request: WebResourceRequest?,
+    ): Boolean = request?.url?.host != ASSET_DOMAIN
+
+    override fun shouldInterceptRequest(
+        view: WebView?,
+        request: WebResourceRequest?,
+    ): WebResourceResponse? = request?.url?.let { assetLoader.shouldInterceptRequest(it) }
+
+    override fun onPageFinished(
+        view: WebView?,
+        url: String?,
+    ) {
         super.onPageFinished(view, url)
         onFinished()
     }
-    override fun onReceivedError(view: WebView?, request: WebResourceRequest?, error: WebResourceError?) {
+
+    override fun onReceivedError(
+        view: WebView?,
+        request: WebResourceRequest?,
+        error: WebResourceError?,
+    ) {
         super.onReceivedError(view, request, error)
         if (request?.isForMainFrame == true) {
             onError(error?.description?.toString() ?: "Connection failed")
         }
     }
-    override fun onReceivedHttpError(view: WebView?, request: WebResourceRequest?, response: WebResourceResponse?) {
+
+    override fun onReceivedHttpError(
+        view: WebView?,
+        request: WebResourceRequest?,
+        response: WebResourceResponse?,
+    ) {
         super.onReceivedHttpError(view, request, response)
         if (request?.isForMainFrame == true) {
-            onError("HTTP error ${response?.statusCode ?: -1}")
+            onError("HTTP error ${response?.statusCode ?: UNKNOWN_HTTP_STATUS}")
         }
     }
 }
 
+@Suppress("FunctionName", "ktlint:standard:function-naming")
 @Composable
 fun LoadingOverlay() {
     Box(
-        modifier = Modifier.fillMaxSize().background(Color(BACKGROUND_COLOR_HEX)),
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .background(Color(BACKGROUND_COLOR_HEX)),
         contentAlignment = Alignment.Center,
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -208,17 +242,29 @@ fun LoadingOverlay() {
                 "Unified Cloud File Manager",
                 color = Color(TEXT_PRIMARY_COLOR),
                 fontSize = TEXT_SIZE_TITLE.sp,
-                fontWeight = FontWeight.SemiBold
+                fontWeight = FontWeight.SemiBold,
             )
-            Text("Loading workspace...", color = Color(TEXT_SECONDARY_COLOR), fontSize = TEXT_SIZE_SUBTITLE.sp)
+            Text(
+                "Loading workspace...",
+                color = Color(TEXT_SECONDARY_COLOR),
+                fontSize = TEXT_SIZE_SUBTITLE.sp,
+            )
         }
     }
 }
 
+@Suppress("FunctionName", "ktlint:standard:function-naming")
 @Composable
-fun ErrorOverlay(errorMsg: String, onRetry: () -> Unit) {
+fun ErrorOverlay(
+    errorMsg: String,
+    onRetry: () -> Unit,
+) {
     Box(
-        modifier = Modifier.fillMaxSize().background(Color(BACKGROUND_COLOR_HEX)).padding(PADDING_DEFAULT.dp),
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .background(Color(BACKGROUND_COLOR_HEX))
+                .padding(PADDING_DEFAULT.dp),
         contentAlignment = Alignment.Center,
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -226,14 +272,18 @@ fun ErrorOverlay(errorMsg: String, onRetry: () -> Unit) {
                 "Unable to Load Workspace",
                 color = Color(ERROR_TEXT_COLOR),
                 fontSize = TEXT_SIZE_ERROR_TITLE.sp,
-                fontWeight = FontWeight.Bold
+                fontWeight = FontWeight.Bold,
             )
             Spacer(modifier = Modifier.height(SPACING_SMALL.dp))
-            Text(errorMsg, color = Color(TEXT_SECONDARY_COLOR), fontSize = TEXT_SIZE_SUBTITLE.sp)
+            Text(
+                errorMsg,
+                color = Color(TEXT_SECONDARY_COLOR),
+                fontSize = TEXT_SIZE_SUBTITLE.sp,
+            )
             Spacer(modifier = Modifier.height(SPACING_LARGE.dp))
             Button(
                 onClick = onRetry,
-                colors = ButtonDefaults.buttonColors(containerColor = Color(BUTTON_CONTAINER_COLOR))
+                colors = ButtonDefaults.buttonColors(containerColor = Color(BUTTON_CONTAINER_COLOR)),
             ) {
                 Text("Retry Connection", color = Color.White)
             }

@@ -1,0 +1,93 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f172a" />
+      <stop offset="50%" stop-color="#1e293b" />
+      <stop offset="100%" stop-color="#0f172a" />
+    </linearGradient>
+    <linearGradient id="cloudGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#3b82f6" />
+      <stop offset="50%" stop-color="#6366f1" />
+      <stop offset="100%" stop-color="#2563eb" />
+    </linearGradient>
+    <linearGradient id="accentLine" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#3b82f6" />
+      <stop offset="50%" stop-color="#a855f7" />
+      <stop offset="100%" stop-color="#38bdf8" />
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="630" fill="url(#bg)" />
+
+  <!-- Grid decoration lines -->
+  <g opacity="0.1" stroke="#94a3b8" stroke-width="1">
+    <line x1="100" y1="0" x2="100" y2="630" />
+    <line x1="300" y1="0" x2="300" y2="630" />
+    <line x1="500" y1="0" x2="500" y2="630" />
+    <line x1="700" y1="0" x2="700" y2="630" />
+    <line x1="900" y1="0" x2="900" y2="630" />
+    <line x1="1100" y1="0" x2="1100" y2="630" />
+    <line x1="0" y1="100" x2="1200" y2="100" />
+    <line x1="0" y1="250" x2="1200" y2="250" />
+    <line x1="0" y1="400" x2="1200" y2="400" />
+    <line x1="0" y1="550" x2="1200" y2="550" />
+  </g>
+
+  <!-- Top accent bar -->
+  <rect x="0" y="0" width="1200" height="6" fill="url(#accentLine)" />
+
+  <!-- Logo Mark -->
+  <g transform="translate(100, 100)">
+    <rect width="84" height="84" rx="24" fill="url(#cloudGrad)" />
+    <!-- Cloud icon -->
+    <path d="M62 44c-.7-8.1-7.7-14.4-16-14.4-6.4 0-11.9 3.8-14.6 9.3-1.4-.6-3-.9-4.7-.9-6.3 0-11.4 5.1-11.4 11.4 0 6.3 5.1 11.4 11.4 11.4h34.6c5.9 0 10.7-4.8 10.7-10.7 0-5.6-4.3-10.2-9.7-10.7z" fill="#ffffff" />
+  </g>
+
+  <!-- Title & Description -->
+  <g transform="translate(210, 140)">
+    <text font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="44" font-weight="800" fill="#f8fafc" letter-spacing="-1">Unified Cloud File Manager</text>
+    <text y="42" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="20" font-weight="500" fill="#94a3b8">Cross-Provider Cloud Storage Workspace</text>
+  </g>
+
+  <!-- Main Headline Box -->
+  <g transform="translate(100, 260)">
+    <text font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="34" font-weight="700" fill="#ffffff">One Unified Canvas for All Your Cloud Drives</text>
+    <text y="48" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="20" font-weight="400" fill="#cbd5e1">Google Drive • Microsoft OneDrive • Dropbox • Box</text>
+    <text y="92" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="16" font-weight="400" fill="#94a3b8">Multi-Account Isolation • Cross-Cloud Search • Quota Governance • Offline Sync Queue</text>
+  </g>
+
+  <!-- Feature Pills -->
+  <g transform="translate(100, 440)">
+    <!-- Pill 1 -->
+    <rect width="260" height="52" rx="14" fill="#1e293b" stroke="#334155" stroke-width="1.5" />
+    <circle cx="28" cy="26" r="8" fill="#10b981" />
+    <text x="48" y="32" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="15" font-weight="600" fill="#e2e8f0">Strict Account Isolation</text>
+
+    <!-- Pill 2 -->
+    <g transform="translate(280, 0)">
+      <rect width="250" height="52" rx="14" fill="#1e293b" stroke="#334155" stroke-width="1.5" />
+      <circle cx="28" cy="26" r="8" fill="#3b82f6" />
+      <text x="48" y="32" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="15" font-weight="600" fill="#e2e8f0">Zero-Storage Footprint</text>
+    </g>
+
+    <!-- Pill 3 -->
+    <g transform="translate(550, 0)">
+      <rect width="260" height="52" rx="14" fill="#1e293b" stroke="#334155" stroke-width="1.5" />
+      <circle cx="28" cy="26" r="8" fill="#8b5cf6" />
+      <text x="48" y="32" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="15" font-weight="600" fill="#e2e8f0">Client-Side Encryption</text>
+    </g>
+
+    <!-- Pill 4 -->
+    <g transform="translate(830, 0)">
+      <rect width="220" height="52" rx="14" fill="#1e293b" stroke="#334155" stroke-width="1.5" />
+      <circle cx="28" cy="26" r="8" fill="#f59e0b" />
+      <text x="48" y="32" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="15" font-weight="600" fill="#e2e8f0">Offline Sync Queue</text>
+    </g>
+  </g>
+
+  <!-- Bottom Brand Note -->
+  <g transform="translate(100, 560)">
+    <text font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="14" font-weight="500" fill="#64748b">https://unified-cloud-file-manager.app — Open-Source Client Architecture</text>
+  </g>
+</svg>

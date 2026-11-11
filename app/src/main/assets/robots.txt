@@ -1,0 +1,9 @@
+# robots.txt for Unified Cloud File Manager
+User-agent: *
+Allow: /
+Allow: /manifest.json
+Allow: /icon.svg
+Disallow: /api/
+Disallow: /private/
+
+Sitemap: https://unified-cloud-file-manager.app/sitemap.xml

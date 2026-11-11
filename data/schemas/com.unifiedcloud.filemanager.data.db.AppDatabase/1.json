@@ -200,7 +200,7 @@
         "tableName": "pending_operation",
         "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `account_id` INTEGER NOT NULL, `operation` TEXT NOT NULL, `file_id` TEXT, `payload` TEXT, `state` TEXT NOT NULL, `created_at` INTEGER NOT NULL, `last_attempt_at` INTEGER, `attempt_count` INTEGER NOT NULL, `outcome_uncertain` INTEGER NOT NULL, FOREIGN KEY(`account_id`) REFERENCES `connected_account`(`local_id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
         "fields": [
-          {"fieldPath": "localId", "columnName": "id", "affinity": "INTEGER", "notNull": true},
+          {"fieldPath": "id", "columnName": "id", "affinity": "INTEGER", "notNull": true},
           {"fieldPath": "accountId", "columnName": "account_id", "affinity": "INTEGER", "notNull": true},
           {"fieldPath": "operation", "columnName": "operation", "affinity": "TEXT", "notNull": true},
           {"fieldPath": "fileId", "columnName": "file_id", "affinity": "TEXT", "notNull": false},

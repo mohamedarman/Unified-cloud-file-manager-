@@ -10,6 +10,13 @@ import {
   PanelLeftClose,
   PanelLeft,
   UserPlus,
+  Star,
+  Trash2,
+  Users,
+  ListRestart,
+  WifiOff,
+  ShieldCheck,
+  LayoutDashboard,
 } from 'lucide-react';
 import { useFileManager, NavigationTab } from '../context/FileManagerContext';
 
@@ -31,7 +38,8 @@ interface NavSection {
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({ onOpenAddAccount }) => {
-  const { currentTab, setCurrentTab, setCurrentFolderId, files } = useFileManager();
+  const { currentTab, setCurrentTab, setCurrentFolderId, files, accounts, pendingOperations } =
+    useFileManager();
   const [isCollapsed, setIsCollapsed] = useState(false);
 
   const handleNav = (tab: NavigationTab) => {
@@ -47,28 +55,72 @@ export const Sidebar: React.FC<SidebarProps> = ({ onOpenAddAccount }) => {
       items: [
         {
           id: 'files' as NavigationTab,
-          label: 'Files',
+          label: 'All Files',
           icon: <Folder className="w-4 h-4 shrink-0 text-amber-500" />,
           count: files.filter((f) => !f.isTrashed).length,
         },
         {
+          id: 'starred' as NavigationTab,
+          label: 'Starred',
+          icon: <Star className="w-4 h-4 shrink-0 text-yellow-500" />,
+          count: files.filter((f) => f.isStarred && !f.isTrashed).length,
+        },
+        {
           id: 'gallery' as NavigationTab,
-          label: 'Gallery',
+          label: 'Media Gallery',
           icon: <Image className="w-4 h-4 shrink-0 text-blue-500" />,
         },
         {
           id: 'search' as NavigationTab,
-          label: 'Search',
+          label: 'Cross-Account Search',
           icon: <Search className="w-4 h-4 shrink-0 text-indigo-500" />,
         },
         {
+          id: 'offline' as NavigationTab,
+          label: 'Offline Cache',
+          icon: <WifiOff className="w-4 h-4 shrink-0 text-cyan-500" />,
+        },
+        {
+          id: 'trash' as NavigationTab,
+          label: 'Trash Bin',
+          icon: <Trash2 className="w-4 h-4 shrink-0 text-rose-500" />,
+          count: files.filter((f) => f.isTrashed).length,
+        },
+      ],
+    },
+    {
+      title: 'Governance & Accounts',
+      items: [
+        {
+          id: 'accounts' as NavigationTab,
+          label: 'Connected Accounts',
+          icon: <Users className="w-4 h-4 shrink-0 text-violet-500" />,
+          count: accounts.length,
+        },
+        {
           id: 'quotas' as NavigationTab,
-          label: 'Storage',
+          label: 'Storage & Quotas',
           icon: <HardDrive className="w-4 h-4 shrink-0 text-emerald-500" />,
         },
         {
+          id: 'operations' as NavigationTab,
+          label: 'Operation Queue',
+          icon: <ListRestart className="w-4 h-4 shrink-0 text-orange-500" />,
+          count: pendingOperations.length,
+        },
+        {
+          id: 'security' as NavigationTab,
+          label: 'Security & Audit',
+          icon: <ShieldCheck className="w-4 h-4 shrink-0 text-teal-500" />,
+        },
+        {
+          id: 'dashboard' as NavigationTab,
+          label: 'Command Center',
+          icon: <LayoutDashboard className="w-4 h-4 shrink-0 text-sky-500" />,
+        },
+        {
           id: 'settings' as NavigationTab,
-          label: 'More / Settings',
+          label: 'Settings',
           icon: <Settings className="w-4 h-4 shrink-0 text-slate-400" />,
         },
       ],

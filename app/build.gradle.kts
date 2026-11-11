@@ -123,7 +123,7 @@ abstract class CopyFrontendAssetsTask : DefaultTask() {
 
     @TaskAction
     fun copyAssets() {
-        fileSystemOperations.copy {
+        fileSystemOperations.sync {
             from(sourceDir)
             into(targetDir)
         }

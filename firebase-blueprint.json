@@ -1,37 +1,140 @@
 {
   "entities": {
+    "userProfile": {
+      "title": "User Profile",
+      "description": "Authenticated workspace user profile",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "localUserId": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "displayName": { "type": "string" },
+        "provider": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email", "displayName"]
+    },
     "account": {
       "title": "Account Reference",
-      "description": "User cloud storage account",
+      "description": "Connected cloud storage account reference",
       "type": "object",
       "properties": {
         "localId": { "type": "number" },
-        "provider": { "type": "string" },
+        "provider": {
+          "type": "string",
+          "enum": ["GOOGLE_DRIVE", "ONE_DRIVE", "DROPBOX", "BOX"]
+        },
+        "providerAccountId": { "type": "string" },
         "displayEmail": { "type": "string" },
-        "displayName": { "type": "string" }
+        "displayName": { "type": "string" },
+        "color": { "type": "string" },
+        "badgeLabel": { "type": "string" },
+        "state": { "type": "string" },
+        "grantedScopes": { "type": "array", "items": { "type": "string" } },
+        "lastVerifiedAt": { "type": "number" }
       },
-      "required": ["localId", "provider"]
+      "required": ["localId", "provider", "displayEmail", "displayName", "state"]
     },
     "file": {
       "title": "Cloud File",
-      "description": "Metadata for a cloud file",
+      "description": "Normalized metadata for an isolated multi-account cloud file",
+      "type": "object",
+      "properties": {
+        "ref": {
+          "type": "object",
+          "properties": {
+            "provider": { "type": "string" },
+            "accountId": { "type": "number" },
+            "fileId": { "type": "string" }
+          },
+          "required": ["provider", "accountId", "fileId"]
+        },
+        "name": { "type": "string" },
+        "mimeType": { "type": "string" },
+        "sizeBytes": { "type": "number" },
+        "modifiedTimeMillis": { "type": "number" },
+        "isFolder": { "type": "boolean" },
+        "parentFolderId": { "type": "string" },
+        "isShared": { "type": "boolean" },
+        "isOwnedByUser": { "type": "boolean" },
+        "isStarred": { "type": "boolean" },
+        "isTrashed": { "type": "boolean" }
+      },
+      "required": ["ref", "name", "mimeType", "modifiedTimeMillis", "isFolder"]
+    },
+    "quota": {
+      "title": "Quota Usage",
+      "description": "Per-account storage quota telemetry",
+      "type": "object",
+      "properties": {
+        "providerId": { "type": "string" },
+        "accountId": { "type": "number" },
+        "usedBytes": { "type": "number" },
+        "limitBytes": { "type": "number" },
+        "manageUrl": { "type": "string" }
+      },
+      "required": ["providerId", "accountId", "usedBytes"]
+    },
+    "operation": {
+      "title": "Pending Operation",
+      "description": "Idempotent file mutation operation record",
+      "type": "object",
+      "properties": {
+        "id": { "type": "number" },
+        "accountId": { "type": "number" },
+        "operation": { "type": "string" },
+        "fileId": { "type": "string" },
+        "fileName": { "type": "string" },
+        "payload": { "type": "string" },
+        "state": { "type": "string" },
+        "createdAt": { "type": "number" },
+        "lastAttemptAt": { "type": "number" },
+        "attemptCount": { "type": "number" },
+        "outcomeUncertain": { "type": "boolean" }
+      },
+      "required": ["id", "accountId", "operation", "fileId", "state", "createdAt"]
+    },
+    "auditLog": {
+      "title": "Audit Log Entry",
+      "description": "Redacted diagnostic and security audit trail entry",
       "type": "object",
       "properties": {
         "id": { "type": "string" },
-        "name": { "type": "string" },
-        "size": { "type": "number" }
+        "timestamp": { "type": "number" },
+        "accountId": { "type": "number" },
+        "action": { "type": "string" },
+        "redactedMessage": { "type": "string" },
+        "correlationTag": { "type": "string" },
+        "severity": { "type": "string", "enum": ["INFO", "WARN", "ERROR"] }
       },
-      "required": ["id", "name"]
+      "required": ["id", "timestamp", "accountId", "action", "redactedMessage", "severity"]
     }
   },
   "firestore": {
-    "/accounts/{userId}/data/{accountId}": {
-      "schema": "account",
-      "description": "User accounts"
+    "/users/{userId}": {
+      "schema": "userProfile",
+      "description": "User workspace profile"
     },
-    "/files/{userId}/data/{fileId}": {
+    "/users/{userId}/accounts/{accountId}": {
+      "schema": "account",
+      "description": "Connected cloud accounts scoped to user"
+    },
+    "/users/{userId}/files/{fileId}": {
       "schema": "file",
-      "description": "User files"
+      "description": "Cloud file metadata scoped to user"
+    },
+    "/users/{userId}/quotas/{accountId}": {
+      "schema": "quota",
+      "description": "Per-account storage quota telemetry scoped to user"
+    },
+    "/users/{userId}/operations/{opId}": {
+      "schema": "operation",
+      "description": "Pending operation queue scoped to user"
+    },
+    "/users/{userId}/auditLogs/{logId}": {
+      "schema": "auditLog",
+      "description": "Redacted security audit log entries scoped to user"
     }
   }
 }

@@ -34,7 +34,9 @@ jobs:
         run: |
           if [ -f package-lock.json ]; then npm ci; else npm install; fi
           npm run lint
+          npm test -- --run
           npm run build
+          rm -rf app/src/main/assets
           mkdir -p app/src/main/assets
           cp -r dist/* app/src/main/assets/
 
