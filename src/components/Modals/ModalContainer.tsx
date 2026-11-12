@@ -122,6 +122,10 @@ export const ModalContainer: React.FC<ModalContainerProps> = ({ modalManager }) 
           onOpenRevisions={(file) => setRevisionsTarget(file)}
           onOpenDeleteConfirm={(file) => setDeleteConfirmTarget(file)}
           onOpenMove={(file) => setMoveTarget(file)}
+          onOpenQuickLook={(file) => {
+            setInspectedFile(null);
+            setQuickLookFile(file);
+          }}
         />
       )}
 

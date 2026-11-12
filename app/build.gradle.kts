@@ -76,22 +76,39 @@ abstract class BuildFrontendTask : DefaultTask() {
     @TaskAction
     fun build() {
         val rootDir = projectRoot.get().asFile
+        val distIndex = File(outputDir.get().asFile, "index.html")
+        if (distIndex.exists()) {
+            return
+        }
+
         val isWindows = System.getProperty("os.name").lowercase().contains("windows")
         val nodeModules = File(rootDir, "node_modules")
         val lockFile = File(rootDir, "package-lock.json")
 
         if (!nodeModules.exists()) {
-            execOperations.exec {
-                workingDir = rootDir
-                if (isWindows) {
-                    if (lockFile.exists()) {
-                        commandLine("cmd", "/c", "npm ci")
+            val ciResult =
+                execOperations.exec {
+                    workingDir = rootDir
+                    isIgnoreExitValue = true
+                    if (isWindows) {
+                        if (lockFile.exists()) {
+                            commandLine("cmd", "/c", "npm ci")
+                        } else {
+                            commandLine("cmd", "/c", "npm install")
+                        }
                     } else {
-                        commandLine("cmd", "/c", "npm install")
+                        if (lockFile.exists()) {
+                            commandLine("npm", "ci")
+                        } else {
+                            commandLine("npm", "install")
+                        }
                     }
-                } else {
-                    if (lockFile.exists()) {
-                        commandLine("npm", "ci")
+                }
+            if (ciResult.exitValue != 0) {
+                execOperations.exec {
+                    workingDir = rootDir
+                    if (isWindows) {
+                        commandLine("cmd", "/c", "npm install")
                     } else {
                         commandLine("npm", "install")
                     }

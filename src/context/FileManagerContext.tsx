@@ -145,6 +145,8 @@ interface FileManagerContextType {
   restoreFile: (file: CloudFile) => void;
   deletePermanently: (file: CloudFile) => void;
   toggleStar: (file: CloudFile) => void;
+  toggleOffline: (file: CloudFile) => void;
+  copyFile: (file: CloudFile, targetFolderId?: string | null) => void;
   createFolder: (accountId: LocalAccountId, name: string, parentFolderId: string | null) => void;
 
   // Capabilities & Quotas
@@ -919,6 +921,53 @@ export const FileManagerProvider: React.FC<{ children: ReactNode }> = ({ childre
     );
   };
 
+  const toggleOffline = (file: CloudFile) => {
+    const nextOffline = !file.isOfflineAvailable;
+    const updatedFile: CloudFile = { ...file, isOfflineAvailable: nextOffline };
+    setFiles((prev) =>
+      prev.map((f) =>
+        cacheKey(f.ref) === cacheKey(file.ref) ? updatedFile : f
+      )
+    );
+    if (inspectedFile && cacheKey(inspectedFile.ref) === cacheKey(file.ref)) {
+      setInspectedFile({ ...inspectedFile, isOfflineAvailable: nextOffline });
+    }
+    void databaseService.saveFile(updatedFile);
+    addAuditLog(
+      file.ref.accountId,
+      'OFFLINE_PIN',
+      `${nextOffline ? 'Pinned' : 'Unpinned'} ${file.name} for offline access`,
+      file.ref.fileId
+    );
+  };
+
+  const copyFile = (file: CloudFile, targetFolderId?: string | null) => {
+    const copyId = `file_copy_${Date.now()}`;
+    const dotIdx = file.name.lastIndexOf('.');
+    const copyName =
+      dotIdx > 0 && !file.isFolder
+        ? `${file.name.slice(0, dotIdx)} (Copy)${file.name.slice(dotIdx)}`
+        : `${file.name} (Copy)`;
+    const clonedFile: CloudFile = {
+      ...file,
+      ref: {
+        ...file.ref,
+        fileId: copyId,
+      },
+      name: copyName,
+      parentFolderId: targetFolderId !== undefined ? targetFolderId : file.parentFolderId,
+      modifiedTimeMillis: Date.now(),
+    };
+    setFiles((prev) => [clonedFile, ...prev]);
+    void databaseService.saveFile(clonedFile);
+    addAuditLog(
+      file.ref.accountId,
+      'COPY_FILE',
+      `Created copy "${copyName}" from ${file.name}`,
+      copyId
+    );
+  };
+
   const createFolder = (accountId: LocalAccountId, name: string, parentFolderId: string | null) => {
     const account = accounts.find((a) => a.localId === accountId);
     if (!account) return;
@@ -1206,6 +1255,8 @@ export const FileManagerProvider: React.FC<{ children: ReactNode }> = ({ childre
         restoreFile,
         deletePermanently,
         toggleStar,
+        toggleOffline,
+        copyFile,
         createFolder,
         capabilities,
         quotas,

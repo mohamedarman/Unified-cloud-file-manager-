@@ -2,7 +2,6 @@ package com.unifiedcloud.filemanager
 
 import android.annotation.SuppressLint
 import android.content.Context
-import android.graphics.Color as AndroidColor
 import android.os.Bundle
 import android.util.Log
 import android.webkit.ConsoleMessage
@@ -14,6 +13,7 @@ import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -42,6 +42,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.webkit.WebViewAssetLoader
+import android.graphics.Color as AndroidColor
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -90,6 +91,11 @@ fun AppWebView() {
     var isLoading by remember { mutableStateOf(true) }
     var loadError by remember { mutableStateOf<String?>(null) }
     var webViewInstance by remember { mutableStateOf<WebView?>(null) }
+    var canNavigateBack by remember { mutableStateOf(false) }
+
+    BackHandler(enabled = canNavigateBack) {
+        webViewInstance?.goBack()
+    }
 
     Box(
         modifier =
@@ -102,7 +108,10 @@ fun AppWebView() {
             factory = { context ->
                 createWebView(
                     context = context,
-                    onFinished = { isLoading = false },
+                    onFinished = {
+                        isLoading = false
+                        canNavigateBack = webViewInstance?.canGoBack() == true
+                    },
                     onError = { error ->
                         loadError = error
                         isLoading = false

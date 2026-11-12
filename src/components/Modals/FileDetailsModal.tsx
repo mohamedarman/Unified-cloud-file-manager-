@@ -35,6 +35,7 @@ interface FileDetailsModalProps {
   onOpenRevisions: (file: CloudFile) => void;
   onOpenDeleteConfirm: (file: CloudFile) => void;
   onOpenMove?: (file: CloudFile) => void;
+  onOpenQuickLook?: (file: CloudFile) => void;
 }
 
 export const FileDetailsModal: React.FC<FileDetailsModalProps> = ({
@@ -44,14 +45,18 @@ export const FileDetailsModal: React.FC<FileDetailsModalProps> = ({
   onOpenRevisions,
   onOpenDeleteConfirm,
   onOpenMove,
+  onOpenQuickLook,
 }) => {
   const {
     accounts,
     capabilities,
     downloadFile,
+    copyFile,
     trashFile,
     restoreFile,
     toggleStar,
+    toggleOffline,
+    navigateToFolder,
     addAuditLog,
   } = useFileManager();
 
@@ -251,11 +256,17 @@ export const FileDetailsModal: React.FC<FileDetailsModalProps> = ({
               {/* OPEN */}
               <ActionButton
                 action={resolvedActions.get(FileAction.OPEN)!}
-                label="Open in Cloud Viewer"
+                label={file.isFolder ? 'Open Folder' : 'Open in Cloud Viewer'}
                 icon={<ExternalLink className="w-4 h-4 text-blue-600" />}
                 onClick={() => {
-                  window.open(file.webViewLink || '#', '_blank');
-                  onClose();
+                  if (file.isFolder) {
+                    navigateToFolder(file.ref.fileId);
+                    onClose();
+                  } else if (onOpenQuickLook) {
+                    onOpenQuickLook(file);
+                  } else {
+                    setShowTextPreview(true);
+                  }
                 }}
               />
 
@@ -300,6 +311,17 @@ export const FileDetailsModal: React.FC<FileDetailsModalProps> = ({
                 }}
               />
 
+              {/* COPY */}
+              <ActionButton
+                action={resolvedActions.get(FileAction.COPY)!}
+                label="Make a Copy"
+                icon={<Copy className="w-4 h-4 text-slate-700" />}
+                onClick={() => {
+                  copyFile(file, file.parentFolderId);
+                  onClose();
+                }}
+              />
+
               {/* STAR / UNSTAR */}
               <ActionButton
                 action={resolvedActions.get(FileAction.STAR)!}
@@ -307,6 +329,16 @@ export const FileDetailsModal: React.FC<FileDetailsModalProps> = ({
                 icon={<Star className={`w-4 h-4 ${file.isStarred ? 'text-amber-500 fill-amber-500' : 'text-slate-500'}`} />}
                 onClick={() => toggleStar(file)}
               />
+
+              {/* OFFLINE PINNING */}
+              {!file.isFolder && (
+                <ActionButton
+                  action={{ action: FileAction.DOWNLOAD, available: accountCapabilities.grantsOfflineAccess === true }}
+                  label={file.isOfflineAvailable ? 'Unpin Offline Copy' : 'Pin for Offline Access'}
+                  icon={<CheckCircle2 className={`w-4 h-4 ${file.isOfflineAvailable ? 'text-emerald-600' : 'text-slate-500'}`} />}
+                  onClick={() => toggleOffline(file)}
+                />
+              )}
 
               {/* SHARE */}
               <ActionButton
