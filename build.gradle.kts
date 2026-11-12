@@ -60,6 +60,11 @@ fun Project.configureKotlinQuality(isAndroid: Boolean) {
         }
     }
 
+    tasks.withType<Test>().configureEach {
+        maxHeapSize = "256m"
+        maxParallelForks = 1
+    }
+
     // detekt and ktlint are wired into `check` so a plain `./gradlew check`
     // is sufficient locally. CI calls the tasks directly for clearer logs.
     tasks.matching { it.name == "check" }.configureEach {
@@ -87,29 +92,28 @@ evaluationDependsOn(":domain")
 val verifyDomainPurity by tasks.registering {
     group = "verification"
     description = "Fails if :domain is not a pure Kotlin JVM module, or if it depends on Android."
-    notCompatibleWithConfigurationCache("Inspects the :domain project model directly to verify purity guarantees")
+
+    val domainProject = project(":domain")
+    val hasJvmPlugin = domainProject.plugins.hasPlugin("org.jetbrains.kotlin.jvm")
+    val appliedBannedPlugins = listOf(
+        "org.jetbrains.kotlin.android",
+        "com.android.application",
+        "com.android.library",
+        "com.android.dynamic-feature",
+    ).filter { domainProject.plugins.hasPlugin(it) }
+
+    val bannedPrefixes = listOf(
+        "androidx.",
+        "com.google.firebase",
+        "com.google.android.gms",
+        "com.google.android.material",
+    )
+    val declaredBannedDependencies = domainProject.configurations.flatMap { config ->
+        config.dependencies.filter { dep -> bannedPrefixes.any { dep.name.startsWith(it) } }
+            .map { dep -> ":${config.name} declares '${dep.name}'" }
+    }
 
     doLast {
-        val domainProject = project(":domain")
-        val hasJvmPlugin = domainProject.plugins.hasPlugin("org.jetbrains.kotlin.jvm")
-        val appliedBannedPlugins = listOf(
-            "org.jetbrains.kotlin.android",
-            "com.android.application",
-            "com.android.library",
-            "com.android.dynamic-feature",
-        ).filter { domainProject.plugins.hasPlugin(it) }
-
-        val bannedPrefixes = listOf(
-            "androidx.",
-            "com.google.firebase",
-            "com.google.android.gms",
-            "com.google.android.material",
-        )
-        val declaredBannedDependencies = domainProject.configurations.flatMap { config ->
-            config.dependencies.filter { dep -> bannedPrefixes.any { dep.name.startsWith(it) } }
-                .map { dep -> ":${config.name} declares '${dep.name}'" }
-        }
-
         val errors = mutableListOf<String>()
 
         if (!hasJvmPlugin) {
@@ -137,42 +141,35 @@ val verifyDomainPurity by tasks.registering {
 // ---------------------------------------------------------------------------
 // Prohibited-phrasing scan - Rules.md §23, PS-1..PS-3, PR-10
 // ---------------------------------------------------------------------------
-// Banned terms derived from Rules.md §1. This is a BUILD-BLOCKING gate, not a
-// review checklist item. It covers source, string resources, and analytics event
-// names, because a banned term in an event name is still a banned term (PS-5).
-val bannedPhrases = listOf(
-    "unlimited google storage",
-    "unlimited storage",
-    "free extra storage",
-    "free extra google storage",
-    "extra google storage",
-    "extra storage",
-    "bypass google drive limits",
-    "bypass drive limits",
-    "pooled storage",
-    "pool storage",
-    "combined quota",
-    "combined storage",
-    "add storage",
-    "more storage for free",
-    "storage pool",
-)
-
-val rootDir = rootProject.projectDir
-
 val scanProhibitedPhrasing by tasks.registering {
     group = "verification"
     description = "Rejects any banned storage claim in source, resources, or analytics names."
-    notCompatibleWithConfigurationCache("Custom script task with doLast")
 
+    val projectRootDir = layout.projectDirectory.asFile
     val roots = listOf(
-        rootDir.resolve("app/src"),
-        rootDir.resolve("data/src"),
-        rootDir.resolve("cloud/src"),
-        rootDir.resolve("core/src"),
-        rootDir.resolve("domain/src"),
+        projectRootDir.resolve("app/src"),
+        projectRootDir.resolve("data/src"),
+        projectRootDir.resolve("cloud/src"),
+        projectRootDir.resolve("core/src"),
+        projectRootDir.resolve("domain/src"),
     )
-    val terms = bannedPhrases
+    val terms = listOf(
+        "unlimited google storage",
+        "unlimited storage",
+        "free extra storage",
+        "free extra google storage",
+        "extra google storage",
+        "extra storage",
+        "bypass google drive limits",
+        "bypass drive limits",
+        "pooled storage",
+        "pool storage",
+        "combined quota",
+        "combined storage",
+        "add storage",
+        "more storage for free",
+        "storage pool",
+    )
     val excludedDirNames = setOf("build", ".git", "node_modules")
 
     doLast {
@@ -188,7 +185,7 @@ val scanProhibitedPhrasing by tasks.registering {
                     val lower = file.readText().lowercase()
                     for (term in terms) {
                         if (lower.contains(term)) {
-                            findings += "${file.relativeTo(rootDir)}: contains banned phrase \"$term\""
+                            findings += "${file.relativeTo(projectRootDir)}: contains banned phrase \"$term\""
                         }
                     }
                 }
@@ -209,19 +206,15 @@ val scanProhibitedPhrasing by tasks.registering {
 val scanApkSecrets by tasks.registering {
     group = "verification"
     description = "Fails if a client secret or token-shaped literal is committed to source."
-    notCompatibleWithConfigurationCache("Custom script task with doLast")
 
+    val projectRootDir = layout.projectDirectory.asFile
     val roots = listOf(
-        rootDir.resolve("app/src"),
-        rootDir.resolve("data/src"),
-        rootDir.resolve("cloud/src"),
-        rootDir.resolve("core/src"),
+        projectRootDir.resolve("app/src"),
+        projectRootDir.resolve("data/src"),
+        projectRootDir.resolve("cloud/src"),
+        projectRootDir.resolve("core/src"),
     )
     val excludedDirNames = setOf("build", ".git", "test", "androidTest")
-
-    // Google OAuth client secrets begin with GOCSPX- (installed-app) or
-    // GOCSPX- (web). Refresh tokens are opaque; we look for the structural
-    // markers rather than attempting to validate a real token.
     val secretPatterns = listOf(
         Regex("""GOCSPX-[A-Za-z0-9_-]{10,}"""),
         Regex("""\b1//[A-Za-z0-9_-]{30,}"""),   // legacy API key style
@@ -242,7 +235,7 @@ val scanApkSecrets by tasks.registering {
                     val text = file.readText()
                     for (pattern in secretPatterns) {
                         if (pattern.containsMatchIn(text)) {
-                            findings += "${file.relativeTo(rootDir)}: matches ${pattern.pattern}"
+                            findings += "${file.relativeTo(projectRootDir)}: matches ${pattern.pattern}"
                         }
                     }
                 }
@@ -260,27 +253,11 @@ val scanApkSecrets by tasks.registering {
 // ---------------------------------------------------------------------------
 // Source encoding - UTF-8, no BOM, and above all no NUL bytes
 // ---------------------------------------------------------------------------
-// This exists because of a real defect, not a hypothetical one.
-// `core/.../logging/Redactor.kt` carried a raw NUL byte inside a string literal
-// (a NUL used as a separator between the account id and the file id in a hash
-// input). Git classified the whole file as binary: it could not be diffed,
-// merged, or grepped, and the first commit recorded it as `Bin 0 -> 4555 bytes`
-// instead of 107 lines of source. The Kotlin was probably fine. Everything
-// around it silently was not.
-//
-// A NUL in source is invisible in an editor, survives review, and breaks tooling
-// in ways that look like unrelated problems. `.gitattributes` cannot catch it -
-// `text` normalisation does not remove NUL bytes, so the file stays binary in
-// the repository however the attributes are set. Only a byte-level check does.
-//
-// The BOM half is the same class of problem: Gradle's Kotlin compilation accepts
-// a BOM, but it defeats byte-offset tooling and has repeatedly caused
-// "invisible character" diffs in Kotlin projects.
 val verifySourceEncoding by tasks.registering {
     group = "verification"
     description = "Fails if a source file contains a NUL byte or a UTF-8 BOM."
-    notCompatibleWithConfigurationCache("Custom script task with doLast")
 
+    val projectRootDir = layout.projectDirectory.asFile
     val roots = listOf("app", "cloud", "core", "data", "domain")
     val extensions = setOf("kt", "kts", "java", "xml", "md", "toml", "yml", "yaml", "json", "pro")
     val excludedDirNames = setOf("build", ".git", ".gradle", "node_modules")
@@ -289,7 +266,7 @@ val verifySourceEncoding by tasks.registering {
         val findings = mutableListOf<String>()
 
         for (module in roots) {
-            val root = rootDir.resolve(module).resolve("src")
+            val root = projectRootDir.resolve(module).resolve("src")
             if (!root.exists()) continue
             root.walkTopDown()
                 .onEnter { it.name !in excludedDirNames }
@@ -302,12 +279,12 @@ val verifySourceEncoding by tasks.registering {
                         bytes[1] == 0xBB.toByte() &&
                         bytes[2] == 0xBF.toByte()
                     ) {
-                        findings += "${file.relativeTo(rootDir)}: starts with a UTF-8 BOM"
+                        findings += "${file.relativeTo(projectRootDir)}: starts with a UTF-8 BOM"
                     }
                     bytes.forEachIndexed { index, byte ->
                         if (byte == 0.toByte()) {
                             val offset = index
-                            findings += "${file.relativeTo(rootDir)}: " +
+                            findings += "${file.relativeTo(projectRootDir)}: " +
                                 "NUL byte at offset $offset - git will treat this file as binary. " +
                                 "Use an escape (\\u0000), not a literal control character."
                             return@forEachIndexed
