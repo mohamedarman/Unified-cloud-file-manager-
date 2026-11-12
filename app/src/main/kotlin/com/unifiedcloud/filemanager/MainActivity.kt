@@ -42,7 +42,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.webkit.WebViewAssetLoader
-import android.graphics.Color as AndroidColor
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -67,7 +66,6 @@ private const val TAG = "UnifiedCloudWebView"
 
 // Constants for styling and configuration
 private const val BACKGROUND_COLOR_HEX = 0xFF0F172A
-private const val BACKGROUND_COLOR_STRING = "#0F172A"
 private const val PROGRESS_INDICATOR_SIZE = 44
 private const val STROKE_WIDTH = 3
 private const val ERROR_TEXT_COLOR = 0xFFF87171
@@ -151,16 +149,15 @@ private fun createWebView(
             .build()
 
     return WebView(context).apply {
-        setBackgroundColor(AndroidColor.parseColor(BACKGROUND_COLOR_STRING))
+        setBackgroundColor(BACKGROUND_COLOR_HEX.toInt())
         settings.apply {
             javaScriptEnabled = true
             domStorageEnabled = true
-            databaseEnabled = true
             allowFileAccess = false
             allowContentAccess = false
             useWideViewPort = true
             loadWithOverviewMode = true
-            mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
+            mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
             setSupportZoom(false)
             cacheMode = WebSettings.LOAD_DEFAULT
         }
