@@ -1,67 +1,26 @@
-import React, { Suspense, lazy } from 'react';
+import React from 'react';
 import { NavigationTab } from '../../context/FileManagerContext';
-import { ViewSuspenseFallback } from '../common/ViewSuspenseFallback';
 import { ErrorBoundary } from '../common/ErrorBoundary';
 import { CloudFile } from '../../types';
-
-// Lazy-loaded views for optimal code-splitting and rapid initial load
-const MultiCloudDashboardView = lazy(() =>
-  import('../Dashboard/MultiCloudDashboardView').then((m) => ({ default: m.MultiCloudDashboardView }))
-);
-const InfrastructureOverviewView = lazy(() =>
-  import('../Infrastructure/InfrastructureOverviewView').then((m) => ({ default: m.InfrastructureOverviewView }))
-);
-const TopologyView = lazy(() =>
-  import('../Infrastructure/TopologyView').then((m) => ({ default: m.TopologyView }))
-);
-const CloudProvidersView = lazy(() =>
-  import('../Providers/CloudProvidersView').then((m) => ({ default: m.CloudProvidersView }))
-);
-const ObservabilityView = lazy(() =>
-  import('../Observability/ObservabilityView').then((m) => ({ default: m.ObservabilityView }))
-);
-const CostManagementView = lazy(() =>
-  import('../Cost/CostManagementView').then((m) => ({ default: m.CostManagementView }))
-);
-const AutomationView = lazy(() =>
-  import('../Automation/AutomationView').then((m) => ({ default: m.AutomationView }))
-);
-const FileBrowser = lazy(() =>
-  import('../FileBrowser/FileBrowser').then((m) => ({ default: m.FileBrowser }))
-);
-const GalleryView = lazy(() =>
-  import('../Gallery/GalleryView').then((m) => ({ default: m.GalleryView }))
-);
-const CrossAccountSearchView = lazy(() =>
-  import('../Search/CrossAccountSearchView').then((m) => ({ default: m.CrossAccountSearchView }))
-);
-const AccountsCenterView = lazy(() =>
-  import('../Accounts/AccountsCenterView').then((m) => ({ default: m.AccountsCenterView }))
-);
-const OfflineFilesView = lazy(() =>
-  import('../Offline/OfflineFilesView').then((m) => ({ default: m.OfflineFilesView }))
-);
-const QuotaGovernorView = lazy(() =>
-  import('../Quota/QuotaGovernorView').then((m) => ({ default: m.QuotaGovernorView }))
-);
-const PendingOperationsView = lazy(() =>
-  import('../Operations/PendingOperationsView').then((m) => ({ default: m.PendingOperationsView }))
-);
-const SecurityAuditView = lazy(() =>
-  import('../Security/SecurityAuditView').then((m) => ({ default: m.SecurityAuditView }))
-);
-const SettingsView = lazy(() =>
-  import('../Settings/SettingsView').then((m) => ({ default: m.SettingsView }))
-);
-const LegalComplianceView = lazy(() =>
-  import('../Legal/LegalComplianceView').then((m) => ({ default: m.LegalComplianceView }))
-);
-const HelpSupportView = lazy(() =>
-  import('../Help/HelpSupportView').then((m) => ({ default: m.HelpSupportView }))
-);
-const NotFoundView = lazy(() =>
-  import('../common/NotFoundView').then((m) => ({ default: m.NotFoundView }))
-);
+import { MultiCloudDashboardView } from '../Dashboard/MultiCloudDashboardView';
+import { InfrastructureOverviewView } from '../Infrastructure/InfrastructureOverviewView';
+import { TopologyView } from '../Infrastructure/TopologyView';
+import { CloudProvidersView } from '../Providers/CloudProvidersView';
+import { ObservabilityView } from '../Observability/ObservabilityView';
+import { CostManagementView } from '../Cost/CostManagementView';
+import { AutomationView } from '../Automation/AutomationView';
+import { FileBrowser } from '../FileBrowser/FileBrowser';
+import { GalleryView } from '../Gallery/GalleryView';
+import { CrossAccountSearchView } from '../Search/CrossAccountSearchView';
+import { AccountsCenterView } from '../Accounts/AccountsCenterView';
+import { OfflineFilesView } from '../Offline/OfflineFilesView';
+import { QuotaGovernorView } from '../Quota/QuotaGovernorView';
+import { PendingOperationsView } from '../Operations/PendingOperationsView';
+import { SecurityAuditView } from '../Security/SecurityAuditView';
+import { SettingsView } from '../Settings/SettingsView';
+import { LegalComplianceView } from '../Legal/LegalComplianceView';
+import { HelpSupportView } from '../Help/HelpSupportView';
+import { NotFoundView } from '../common/NotFoundView';
 
 interface ViewRouterProps {
   currentTab: NavigationTab;
@@ -114,7 +73,14 @@ export const ViewRouter: React.FC<ViewRouterProps> = ({
       case 'security_policies':
         return <SecurityAuditView />;
       case 'dashboard':
-        return <MultiCloudDashboardView />;
+        return (
+          <MultiCloudDashboardView
+            onOpenAddAccount={onOpenAddAccount}
+            onOpenUpload={onOpenUpload}
+            onOpenNewFolder={onOpenNewFolder}
+            onOpenDetails={onOpenDetails}
+          />
+        );
       case 'infra_overview':
       case 'infra_compute':
       case 'infra_storage':
@@ -149,10 +115,7 @@ export const ViewRouter: React.FC<ViewRouterProps> = ({
 
   return (
     <ErrorBoundary fallbackTitle={`Error rendering ${currentTab} view`}>
-      <Suspense fallback={<ViewSuspenseFallback />}>
-        {renderScreen()}
-      </Suspense>
+      {renderScreen()}
     </ErrorBoundary>
   );
 };
-

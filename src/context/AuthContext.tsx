@@ -1,13 +1,14 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { auth as firebaseAuth } from '../firebase';
-import { 
-  signInWithPopup, 
-  GoogleAuthProvider, 
-  signInWithEmailAndPassword, 
-  createUserWithEmailAndPassword, 
+import {
+  signInWithPopup,
+  GoogleAuthProvider,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  sendPasswordResetEmail,
   signOut,
   onAuthStateChanged,
-  User 
+  User,
 } from 'firebase/auth';
 import { authService, AuthUser, AuthSession } from '../services/authService';
 import { databaseService } from '../services/databaseService';
@@ -24,6 +25,7 @@ interface AuthContextType {
   loginWithGoogle: (email?: string, name?: string) => Promise<void>;
   loginWithEmail: (email: string, password: string) => Promise<void>;
   signupWithEmail: (email: string, password: string, name: string) => Promise<void>;
+  sendPasswordReset: (email: string) => Promise<void>;
   switchAccount: (userId: string) => Promise<void>;
   logout: () => void;
   clearSessionError: () => void;
@@ -132,15 +134,20 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       let resolvedEmail = email;
       let resolvedName = name;
 
-      // Attempt Firebase Google popup when no explicit email is passed and not restricted by WebView
       const isAndroidWebView =
         typeof window !== 'undefined' &&
         (window.location.hostname === 'appassets.androidplatform.net' ||
           /wv|Version\/\d+\.\d+.*Chrome/.test(navigator.userAgent));
 
-      if (!resolvedEmail && !isAndroidWebView) {
+      if (!resolvedEmail) {
+        if (isAndroidWebView) {
+          throw new Error(
+            'Google OAuth browser popups are blocked inside embedded Android WebView (RFC 8252). Please sign in or create an account using Email & Password below, or configure Android AppAuth / Custom Tabs.'
+          );
+        }
         try {
           const provider = new GoogleAuthProvider();
+          provider.setCustomParameters({ prompt: 'select_account' });
           const result = await signInWithPopup(firebaseAuth, provider);
           resolvedEmail = result.user.email || undefined;
           resolvedName = result.user.displayName || undefined;
@@ -149,8 +156,17 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request') {
             throw new Error('Google Sign-In popup was closed before completing authentication.');
           }
-          // For WebView / unauthorized-domain / environment restrictions, fall back to local Google OAuth vault
-          console.warn('Firebase popup unavailable in this environment, using local Google session vault:', code);
+          if (
+            code === 'auth/unauthorized-domain' ||
+            code === 'auth/operation-not-supported-in-this-environment'
+          ) {
+            throw new Error(
+              'Google OAuth popup is not authorized for this domain in Firebase Console. Please sign in or register using Email & Password below.'
+            );
+          }
+          const message =
+            popupErr instanceof Error ? popupErr.message : 'Google OAuth authentication failed.';
+          throw new Error(message);
         }
       }
 
@@ -169,18 +185,19 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const loginWithEmail = async (email: string, password: string): Promise<void> => {
     setSessionError(null);
     try {
-      // Authenticate against cryptographic local vault first (supports pre-seeded owner & enterprise accounts + registered users)
       let res: { user: AuthUser; session: AuthSession };
       try {
         res = await authService.authenticate(email, password);
       } catch (vaultErr) {
-        // If user exists in Firebase Auth from another device, verify with Firebase Auth and register locally
-        const fbCred = await signInWithEmailAndPassword(firebaseAuth, email, password);
-        res = await authService.authenticateWithGoogle(
-          fbCred.user.email || email,
-          fbCred.user.displayName || email.split('@')[0]
-        );
-        void vaultErr;
+        try {
+          const fbCred = await signInWithEmailAndPassword(firebaseAuth, email, password);
+          res = await authService.authenticateWithGoogle(
+            fbCred.user.email || email,
+            fbCred.user.displayName || email.split('@')[0]
+          );
+        } catch {
+          throw vaultErr;
+        }
       }
 
       // Best-effort Firebase Auth session synchronization for Firestore rules
@@ -228,6 +245,20 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
+  const sendPasswordReset = async (email: string): Promise<void> => {
+    setSessionError(null);
+    const normalizedEmail = authService.validateEmail(email);
+    try {
+      await sendPasswordResetEmail(firebaseAuth, normalizedEmail);
+    } catch (err: unknown) {
+      const code = (err as { code?: string })?.code || '';
+      if (code === 'auth/invalid-email') {
+        throw new Error('Please enter a valid email address.');
+      }
+      // For offline or local-only accounts in WebView, complete gracefully without leaking account existence
+    }
+  };
+
   const switchAccount = async (targetUserId: string): Promise<void> => {
     setSessionError(null);
     const result = await authService.switchAccount(targetUserId);
@@ -265,6 +296,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         loginWithGoogle,
         loginWithEmail,
         signupWithEmail,
+        sendPasswordReset,
         switchAccount,
         logout,
         clearSessionError,

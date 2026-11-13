@@ -1,46 +1,18 @@
-import React, { Suspense, lazy } from 'react';
+import React from 'react';
 import { ModalManagerState } from '../../hooks/useModalManager';
-
-// Lazy-loaded modal components for maximum initial load performance
-const CommandPalette = lazy(() =>
-  import('../CommandPalette/CommandPalette').then((m) => ({ default: m.CommandPalette }))
-);
-const KeyboardShortcutsModal = lazy(() =>
-  import('./KeyboardShortcutsModal').then((m) => ({ default: m.KeyboardShortcutsModal }))
-);
-const QuickLookModal = lazy(() =>
-  import('./QuickLookModal').then((m) => ({ default: m.QuickLookModal }))
-);
-const FileDetailsModal = lazy(() =>
-  import('./FileDetailsModal').then((m) => ({ default: m.FileDetailsModal }))
-);
-const UploadModal = lazy(() =>
-  import('./UploadModal').then((m) => ({ default: m.UploadModal }))
-);
-const AddAccountModal = lazy(() =>
-  import('./AddAccountModal').then((m) => ({ default: m.AddAccountModal }))
-);
-const NewFolderModal = lazy(() =>
-  import('./NewFolderModal').then((m) => ({ default: m.NewFolderModal }))
-);
-const RenameModal = lazy(() =>
-  import('./RenameModal').then((m) => ({ default: m.RenameModal }))
-);
-const MoveModal = lazy(() =>
-  import('./MoveModal').then((m) => ({ default: m.MoveModal }))
-);
-const RevisionsModal = lazy(() =>
-  import('./RevisionsModal').then((m) => ({ default: m.RevisionsModal }))
-);
-const DeleteConfirmModal = lazy(() =>
-  import('./DeleteConfirmModal').then((m) => ({ default: m.DeleteConfirmModal }))
-);
-const MobileMoreDrawer = lazy(() =>
-  import('../MobileMoreDrawer').then((m) => ({ default: m.MobileMoreDrawer }))
-);
-const OnboardingModal = lazy(() =>
-  import('../Onboarding/OnboardingModal').then((m) => ({ default: m.OnboardingModal }))
-);
+import { CommandPalette } from '../CommandPalette/CommandPalette';
+import { KeyboardShortcutsModal } from './KeyboardShortcutsModal';
+import { QuickLookModal } from './QuickLookModal';
+import { FileDetailsModal } from './FileDetailsModal';
+import { UploadModal } from './UploadModal';
+import { AddAccountModal } from './AddAccountModal';
+import { NewFolderModal } from './NewFolderModal';
+import { RenameModal } from './RenameModal';
+import { MoveModal } from './MoveModal';
+import { RevisionsModal } from './RevisionsModal';
+import { DeleteConfirmModal } from './DeleteConfirmModal';
+import { MobileMoreDrawer } from '../MobileMoreDrawer';
+import { OnboardingModal } from '../Onboarding/OnboardingModal';
 
 interface ModalContainerProps {
   modalManager: ModalManagerState;
@@ -81,8 +53,8 @@ export const ModalContainer: React.FC<ModalContainerProps> = ({ modalManager }) 
   } = modalManager;
 
   return (
-    <Suspense fallback={null}>
-      {/* Universal Command Palette (⌘K) - Lazy Loaded */}
+    <>
+      {/* Universal Command Palette (⌘K) */}
       {isCommandPaletteOpen && (
         <CommandPalette
           isOpen={true}
@@ -93,7 +65,7 @@ export const ModalContainer: React.FC<ModalContainerProps> = ({ modalManager }) 
         />
       )}
 
-      {/* Keyboard Shortcuts Cheatsheet Modal (?) - Lazy Loaded */}
+      {/* Keyboard Shortcuts Cheatsheet Modal (?) */}
       {isShortcutsOpen && (
         <KeyboardShortcutsModal
           isOpen={true}
@@ -101,7 +73,7 @@ export const ModalContainer: React.FC<ModalContainerProps> = ({ modalManager }) 
         />
       )}
 
-      {/* Quick Look Spacebar Modal - Lazy Loaded */}
+      {/* Quick Look Spacebar Modal */}
       {quickLookFile && (
         <QuickLookModal
           file={quickLookFile}
@@ -113,7 +85,7 @@ export const ModalContainer: React.FC<ModalContainerProps> = ({ modalManager }) 
         />
       )}
 
-      {/* File Details Drawer / Modal - Lazy Loaded */}
+      {/* File Details Drawer / Modal */}
       {inspectedFile && (
         <FileDetailsModal
           file={inspectedFile}
@@ -129,31 +101,31 @@ export const ModalContainer: React.FC<ModalContainerProps> = ({ modalManager }) 
         />
       )}
 
-      {/* Upload Modal - Lazy Loaded */}
+      {/* Upload Modal */}
       {isUploadOpen && <UploadModal onClose={closeUpload} />}
 
-      {/* Connect Account Modal - Lazy Loaded */}
+      {/* Connect Account Modal */}
       {isAddAccountOpen && <AddAccountModal onClose={closeAddAccount} />}
 
-      {/* New Folder Modal - Lazy Loaded */}
+      {/* New Folder Modal */}
       {isNewFolderOpen && <NewFolderModal onClose={closeNewFolder} />}
 
-      {/* Rename Modal - Lazy Loaded */}
+      {/* Rename Modal */}
       {renameTarget && (
         <RenameModal file={renameTarget} onClose={() => setRenameTarget(null)} />
       )}
 
-      {/* Move Modal - Lazy Loaded */}
+      {/* Move Modal */}
       {moveTarget && (
         <MoveModal file={moveTarget} onClose={() => setMoveTarget(null)} />
       )}
 
-      {/* Revisions History Modal - Lazy Loaded */}
+      {/* Revisions History Modal */}
       {revisionsTarget && (
         <RevisionsModal file={revisionsTarget} onClose={() => setRevisionsTarget(null)} />
       )}
 
-      {/* Delete Permanently Confirmation Modal - Lazy Loaded */}
+      {/* Delete Permanently Confirmation Modal */}
       {deleteConfirmTarget && (
         <DeleteConfirmModal
           file={deleteConfirmTarget}
@@ -161,7 +133,7 @@ export const ModalContainer: React.FC<ModalContainerProps> = ({ modalManager }) 
         />
       )}
 
-      {/* Mobile More Slide-Up Drawer - Lazy Loaded */}
+      {/* Mobile More Slide-Up Drawer */}
       {isMoreDrawerOpen && (
         <MobileMoreDrawer
           isOpen={true}
@@ -173,8 +145,8 @@ export const ModalContainer: React.FC<ModalContainerProps> = ({ modalManager }) 
         />
       )}
 
-      {/* Onboarding Tour Modal - Lazy Loaded */}
+      {/* Onboarding Tour Modal */}
       {isTourOpen && <OnboardingModal onClose={closeTour} />}
-    </Suspense>
+    </>
   );
 };

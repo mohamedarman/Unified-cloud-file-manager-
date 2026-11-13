@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.os.Bundle
 import android.util.Log
+import android.view.ViewGroup
 import android.webkit.ConsoleMessage
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceError
@@ -149,6 +150,11 @@ private fun createWebView(
             .build()
 
     return WebView(context).apply {
+        layoutParams =
+            ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT,
+            )
         setBackgroundColor(BACKGROUND_COLOR_HEX.toInt())
         settings.apply {
             javaScriptEnabled = true

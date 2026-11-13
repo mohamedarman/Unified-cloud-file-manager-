@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { X, ShieldCheck, Check, Key, ArrowRight, Cloud } from 'lucide-react';
+import { X, Check, Key, ArrowRight, Cloud } from 'lucide-react';
 import { useFileManager } from '../../context/FileManagerContext';
+import { useAuth } from '../../context/AuthContext';
 import { ProviderId, PROVIDERS } from '../../types';
 
 interface AddAccountModalProps {
@@ -9,30 +10,32 @@ interface AddAccountModalProps {
 
 export const AddAccountModal: React.FC<AddAccountModalProps> = ({ onClose }) => {
   const { connectAccount, accounts } = useFileManager();
+  const { user } = useAuth();
 
   const [selectedProvider, setSelectedProvider] = useState<ProviderId>('GOOGLE_DRIVE');
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState(user?.email || '');
   const [displayName, setDisplayName] = useState('');
-  const [badgeLabel, setBadgeLabel] = useState('');
+  const [badgeLabel, setBadgeLabel] = useState(PROVIDERS.GOOGLE_DRIVE.shortName);
   const [step, setStep] = useState<'FORM' | 'AUTHORIZING' | 'VERIFYING' | 'DONE'>('FORM');
   const [error, setError] = useState<string | null>(null);
 
   const providerMeta = PROVIDERS[selectedProvider];
 
   const handleStartOAuth = () => {
-    if (!email || !email.includes('@')) {
-      setError('Please provide a valid account email.');
+    const trimmedEmail = email.trim();
+    if (!trimmedEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+      setError('Please provide a valid account email address.');
       return;
     }
 
     if (
       accounts.some(
         (a) =>
-          a.displayEmail.toLowerCase() === email.toLowerCase() &&
+          a.displayEmail.toLowerCase() === trimmedEmail.toLowerCase() &&
           a.provider === selectedProvider
       )
     ) {
-      setError(`This ${providerMeta.name} account is already connected.`);
+      setError(`This ${providerMeta.name} account (${trimmedEmail}) is already connected.`);
       return;
     }
 
@@ -46,15 +49,15 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({ onClose }) => 
         setTimeout(() => {
           connectAccount(
             selectedProvider,
-            email,
-            displayName || `${providerMeta.shortName} (${email.split('@')[0]})`,
-            badgeLabel || providerMeta.shortName,
+            trimmedEmail,
+            displayName.trim() || `${providerMeta.shortName} (${trimmedEmail.split('@')[0]})`,
+            badgeLabel.trim() || providerMeta.shortName,
             ['read', 'write', 'profile']
           );
           onClose();
-        }, 700);
-      }, 900);
-    }, 1100);
+        }, 450);
+      }, 550);
+    }, 600);
   };
 
   return (
@@ -80,13 +83,15 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({ onClose }) => 
                 Connect Cloud Account
               </h3>
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                OAuth 2.0 Authorization & Verification
+                OAuth 2.0 PKCE Authorization & Verification
               </p>
             </div>
           </div>
           <button
+            type="button"
             onClick={onClose}
-            className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
+            aria-label="Close modal"
+            className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
@@ -102,7 +107,7 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({ onClose }) => 
           <div className="space-y-4">
             {/* 1. Provider Selector */}
             <div>
-              <label className="text-xs font-semibold text-slate-700 block mb-1.5">
+              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1.5">
                 Select Cloud Storage Provider
               </label>
               <div className="grid grid-cols-2 gap-2">
@@ -111,7 +116,8 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({ onClose }) => 
                   const isSelected = selectedProvider === pId;
 
                   return (
-                    <div
+                    <button
+                      type="button"
                       key={pId}
                       onClick={() => {
                         setSelectedProvider(pId);
@@ -119,8 +125,8 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({ onClose }) => 
                       }}
                       className={`p-2.5 rounded-xl border text-xs cursor-pointer transition flex items-center justify-between ${
                         isSelected
-                          ? 'border-blue-500 bg-blue-50/60 ring-1 ring-blue-400 font-semibold'
-                          : 'border-slate-200 hover:border-slate-300 bg-white'
+                          ? 'border-blue-500 bg-blue-50/60 dark:bg-blue-950/50 ring-1 ring-blue-400 font-semibold'
+                          : 'border-slate-200 dark:border-slate-700 hover:border-slate-300 bg-white dark:bg-slate-800'
                       }`}
                     >
                       <div className="flex items-center gap-2">
@@ -128,10 +134,10 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({ onClose }) => 
                           className="w-3 h-3 rounded-full"
                           style={{ backgroundColor: p.brandColor }}
                         />
-                        <span className="text-slate-900">{p.name}</span>
+                        <span className="text-slate-900 dark:text-white">{p.name}</span>
                       </div>
                       {isSelected && <Check className="w-3.5 h-3.5 text-blue-600 shrink-0" />}
-                    </div>
+                    </button>
                   );
                 })}
               </div>
@@ -139,95 +145,69 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({ onClose }) => 
 
             {/* Account Email */}
             <div>
-              <label className="text-xs font-semibold text-slate-700 block mb-1">
-                {providerMeta.name} Email Address
+              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">
+                {providerMeta.name} Account Email
               </label>
               <input
                 type="email"
-                placeholder="e.g. user@gmail.com or name@enterprise.com"
+                placeholder="name@company.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 outline-none focus:border-blue-500"
+                className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-800 dark:text-slate-100 outline-none focus:border-blue-500"
               />
             </div>
 
             {/* Display name & label */}
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-xs font-semibold text-slate-700 block mb-1">
+                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">
                   Display Label
                 </label>
                 <input
                   type="text"
-                  placeholder="e.g. Work, Personal, Media"
+                  placeholder="e.g. Work, Personal"
                   value={badgeLabel}
                   onChange={(e) => setBadgeLabel(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 outline-none focus:border-blue-500"
+                  className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-800 dark:text-slate-100 outline-none focus:border-blue-500"
                 />
               </div>
 
               <div>
-                <label className="text-xs font-semibold text-slate-700 block mb-1">
-                  Friendly Name
+                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">
+                  Account Nickname
                 </label>
                 <input
                   type="text"
-                  placeholder="e.g. Alex Work Drive"
+                  placeholder={`e.g. ${providerMeta.shortName} Workspace`}
                   value={displayName}
                   onChange={(e) => setDisplayName(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 outline-none focus:border-blue-500"
+                  className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-800 dark:text-slate-100 outline-none focus:border-blue-500"
                 />
               </div>
             </div>
 
             {/* Architectural disclosure */}
-            <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 text-[11px] text-slate-500 space-y-1">
-              <span className="font-semibold text-slate-700 block">
+            <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-[11px] text-slate-500 dark:text-slate-400 space-y-1">
+              <span className="font-semibold text-slate-700 dark:text-slate-200 block">
                 Direct Provider Storage Notice:
               </span>
               <p>
-                Connecting {providerMeta.name} grants this applet client-side access to browse and upload files directly. Your storage quota remains metered and enforced solely by {providerMeta.name}.
+                Connecting {providerMeta.name} grants client-side access to browse and manage files in your account. Your storage quota remains metered and enforced solely by {providerMeta.name}.
               </p>
             </div>
 
-            {/* Demo shortcuts */}
-            <div className="pt-2 border-t border-slate-100">
-              <span className="text-[11px] text-slate-400 block mb-1 font-medium">
-                Quick Demo Accounts:
-              </span>
-              <div className="flex flex-wrap gap-1.5">
-                {[
-                  { provider: 'GOOGLE_DRIVE' as ProviderId, email: 'alex.cloud@gmail.com', label: 'GDrive Backup' },
-                  { provider: 'ONE_DRIVE' as ProviderId, email: 'alex.project@enterprise.com', label: 'OneDrive Pro' },
-                  { provider: 'DROPBOX' as ProviderId, email: 'alex.studio@dropbox.com', label: 'Dropbox Studio' },
-                  { provider: 'BOX' as ProviderId, email: 'alex.collab@box.com', label: 'Box Lab' },
-                ].map((demo) => (
-                  <button
-                    key={demo.email}
-                    onClick={() => {
-                      setSelectedProvider(demo.provider);
-                      setEmail(demo.email);
-                      setBadgeLabel(demo.label);
-                      setDisplayName(demo.label);
-                    }}
-                    className="px-2 py-1 rounded bg-slate-100 hover:bg-slate-200 text-[11px] text-slate-700 transition"
-                  >
-                    + {demo.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+            <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100 dark:border-slate-800">
               <button
+                type="button"
                 onClick={onClose}
-                className="px-4 py-2 text-xs font-medium text-slate-600 hover:bg-slate-100 rounded-xl"
+                className="px-4 py-2 text-xs font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl cursor-pointer"
               >
                 Cancel
               </button>
               <button
+                type="button"
                 onClick={handleStartOAuth}
-                className="px-4 py-2 text-xs font-medium bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-xs transition flex items-center gap-1.5"
+                className="px-4 py-2 text-xs font-medium bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-xs transition flex items-center gap-1.5 cursor-pointer"
               >
                 <span>Authorize {providerMeta.shortName}</span>
                 <ArrowRight className="w-3.5 h-3.5" />
@@ -255,19 +235,19 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({ onClose }) => 
             </div>
 
             <div>
-              <h4 className="font-semibold text-slate-900 text-sm">
+              <h4 className="font-semibold text-slate-900 dark:text-white text-sm">
                 {step === 'AUTHORIZING'
                   ? `Requesting ${providerMeta.name} OAuth 2.0 Consent...`
                   : step === 'VERIFYING'
-                  ? 'Exercising Live Verification Call (about.get)...'
+                  ? 'Verifying Account Capabilities & Quota...'
                   : 'Account Verified & Connected!'}
               </h4>
-              <p className="text-xs text-slate-500 mt-1 max-w-xs">
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-xs">
                 {step === 'AUTHORIZING'
                   ? 'Client-side PKCE code exchange initiated.'
                   : step === 'VERIFYING'
-                  ? 'Verifying account token against cloud endpoint.'
-                  : `Account added to Unified Index. State: CONNECTED.`}
+                  ? 'Validating account session against provider endpoint.'
+                  : 'Account added to Unified Index. State: CONNECTED.'}
               </p>
             </div>
           </div>

@@ -7,28 +7,38 @@ import {
   EyeOff,
   User,
   ArrowRight,
+  ArrowLeft,
   ShieldCheck,
   CheckCircle2,
-  Sparkles,
-  Smartphone,
-  Layers,
+  Compass,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
-import { toast } from 'sonner';
+import { OnboardingModal } from '../Onboarding/OnboardingModal';
 
 export const LoginPage: React.FC = () => {
-  const { loginWithGoogle, loginWithEmail, signupWithEmail, sessionError, clearSessionError, availableUsers } = useAuth();
+  const {
+    loginWithGoogle,
+    loginWithEmail,
+    signupWithEmail,
+    sendPasswordReset,
+    sessionError,
+    clearSessionError,
+  } = useAuth();
 
-  const [mode, setMode] = useState<'signin' | 'signup'>('signin');
+  const [mode, setMode] = useState<'signin' | 'signup' | 'forgot'>('signin');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [resetSuccessMessage, setResetSuccessMessage] = useState<string | null>(null);
   const [failedAttempts, setFailedAttempts] = useState(0);
   const [cooldownSeconds, setCooldownSeconds] = useState(0);
   const [legalModal, setLegalModal] = useState<'privacy' | 'terms' | null>(null);
+  const [showOnboardingTour, setShowOnboardingTour] = useState<boolean>(() => {
+    return !localStorage.getItem('ucfm_onboarding_completed');
+  });
 
   // Rate-limiting cooldown countdown effect
   React.useEffect(() => {
@@ -45,6 +55,7 @@ export const LoginPage: React.FC = () => {
       return;
     }
     clearSessionError();
+    setResetSuccessMessage(null);
     setIsLoading(true);
     setError(null);
     try {
@@ -65,12 +76,42 @@ export const LoginPage: React.FC = () => {
     }
   };
 
+  const handlePasswordResetSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    clearSessionError();
+    setError(null);
+    setResetSuccessMessage(null);
+
+    const cleanEmail = email.trim();
+    if (!cleanEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+      setError('Please enter a valid email address to receive recovery instructions.');
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      await sendPasswordReset(cleanEmail);
+      setResetSuccessMessage(
+        `If an account exists for ${cleanEmail}, password recovery instructions have been sent.`
+      );
+    } catch (err: unknown) {
+      setError(
+        err instanceof Error ? err.message : 'Unable to process password reset request.'
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleEmailSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (cooldownSeconds > 0) {
       setError(`Too many failed attempts. Please wait ${cooldownSeconds}s before retrying.`);
       return;
     }
+    clearSessionError();
+    setResetSuccessMessage(null);
+
     const cleanEmail = email.trim();
     if (!cleanEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
       setError('Please provide a valid email address.');
@@ -90,8 +131,8 @@ export const LoginPage: React.FC = () => {
     try {
       if (mode === 'signup') {
         const cleanName = name.trim();
-        if (!cleanName) {
-          setError('Please provide your display name.');
+        if (!cleanName || cleanName.length < 2) {
+          setError('Please provide your full name (at least 2 characters).');
           setIsLoading(false);
           return;
         }
@@ -100,14 +141,18 @@ export const LoginPage: React.FC = () => {
         await loginWithEmail(cleanEmail, password);
       }
       setFailedAttempts(0);
-    } catch (err: any) {
+    } catch (err: unknown) {
       const nextFail = failedAttempts + 1;
       setFailedAttempts(nextFail);
       if (nextFail >= 5) {
         setCooldownSeconds(60);
         setError('Too many failed attempts. Security cooldown active for 60 seconds.');
       } else {
-        setError(err?.message || 'Authentication failed. Please verify credentials.');
+        setError(
+          err instanceof Error
+            ? err.message
+            : 'Authentication failed. Please verify your credentials.'
+        );
       }
     } finally {
       setIsLoading(false);
@@ -115,9 +160,9 @@ export const LoginPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen w-screen flex flex-col justify-between bg-gradient-to-b from-slate-50 via-slate-100 to-slate-200 text-slate-900 font-sans p-4 sm:p-6 selection:bg-blue-100">
+    <div className="min-h-screen w-full flex flex-col justify-between bg-gradient-to-b from-slate-50 via-slate-100 to-slate-200 text-slate-900 font-sans p-4 sm:p-6 selection:bg-blue-100 overflow-y-auto">
       {/* Top Bar */}
-      <header className="max-w-5xl w-full mx-auto flex items-center justify-between py-2">
+      <header className="max-w-5xl w-full mx-auto flex items-center justify-between py-2 gap-2">
         <div className="flex items-center gap-2.5">
           <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-blue-500 flex items-center justify-center text-white shadow-sm shadow-blue-500/20">
             <Cloud className="w-5 h-5" />
@@ -132,11 +177,22 @@ export const LoginPage: React.FC = () => {
           </div>
         </div>
 
-        <span className="text-[11px] font-medium text-blue-700 bg-blue-50 px-2.5 py-1 rounded-full border border-blue-200 flex items-center gap-1.5">
-          <ShieldCheck className="w-3.5 h-3.5 text-blue-600" />
-          <span className="hidden sm:inline">Zero-Storage Architecture</span>
-          <span className="sm:hidden">Secure</span>
-        </span>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setShowOnboardingTour(true)}
+            className="text-[11px] font-medium text-slate-700 bg-white hover:bg-slate-50 px-2.5 py-1 rounded-full border border-slate-200 flex items-center gap-1.5 transition cursor-pointer shadow-2xs"
+          >
+            <Compass className="w-3.5 h-3.5 text-blue-600" />
+            <span>Platform Tour</span>
+          </button>
+
+          <span className="text-[11px] font-medium text-blue-700 bg-blue-50 px-2.5 py-1 rounded-full border border-blue-200 flex items-center gap-1.5">
+            <ShieldCheck className="w-3.5 h-3.5 text-blue-600" />
+            <span className="hidden sm:inline">Zero-Storage Architecture</span>
+            <span className="sm:hidden">Secure</span>
+          </span>
+        </div>
       </header>
 
       {/* Main Form Container */}
@@ -145,223 +201,270 @@ export const LoginPage: React.FC = () => {
           {/* Welcome Title */}
           <div className="text-center space-y-1">
             <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
-              {mode === 'signin' ? 'Sign in to your account' : 'Create your account'}
+              {mode === 'signin'
+                ? 'Sign in to your account'
+                : mode === 'signup'
+                ? 'Create your account'
+                : 'Reset your password'}
             </h1>
             <p className="text-xs text-slate-500">
-              Access Google Drive, OneDrive, Dropbox & Box in one unified interface
+              {mode === 'forgot'
+                ? 'Enter your registered email address to receive password reset instructions'
+                : 'Access Google Drive, OneDrive, Dropbox & Box in one unified interface'}
             </p>
           </div>
 
           {(error || sessionError) && (
-            <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs">
+            <div
+              role="alert"
+              className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs leading-relaxed"
+            >
               {error || sessionError}
             </div>
           )}
 
-          {/* 1. Continue with Google Button */}
-          <div>
-            <button
-              onClick={handleGoogleSubmit}
-              disabled={isLoading}
-              className="w-full flex items-center justify-center gap-3 py-3 px-4 rounded-2xl border border-slate-200 bg-white hover:bg-slate-50 hover:border-slate-300 text-slate-700 font-semibold text-xs sm:text-sm shadow-xs transition duration-150 disabled:opacity-50 cursor-pointer"
+          {resetSuccessMessage && (
+            <div
+              role="status"
+              className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-start gap-2 leading-relaxed"
             >
-              {/* Official Google G Logo */}
-              <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
-                <path
-                  fill="#4285F4"
-                  d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.66-5.17 3.66-9.17z"
-                />
-                <path
-                  fill="#34A853"
-                  d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.33 24 12 24z"
-                />
-                <path
-                  fill="#FBBC05"
-                  d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 9.99 0 12s.45 3.82 1.25 5.42l4.03-3.15z"
-                />
-                <path
-                  fill="#EA4335"
-                  d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"
-                />
-              </svg>
-              <span>Continue with Google</span>
-            </button>
-          </div>
-
-          {/* Quick Vault Account Sign-In for Owner & Enterprise Demo */}
-          {mode === 'signin' && availableUsers.length > 0 && (
-            <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
-                  Quick Vault Access
-                </span>
-                <span className="text-[10px] text-blue-600 font-medium">
-                  1-Click Sign In
-                </span>
-              </div>
-              <div className="grid grid-cols-1 gap-1.5">
-                {availableUsers.slice(0, 2).map((u) => (
-                  <button
-                    key={u.id}
-                    type="button"
-                    disabled={isLoading}
-                    onClick={async () => {
-                      clearSessionError();
-                      setError(null);
-                      setIsLoading(true);
-                      try {
-                        await loginWithGoogle(u.email, u.name);
-                      } catch (e: unknown) {
-                        setError(e instanceof Error ? e.message : 'Quick sign-in failed');
-                      } finally {
-                        setIsLoading(false);
-                      }
-                    }}
-                    className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-white hover:bg-blue-50/60 border border-slate-200 hover:border-blue-300 text-left transition cursor-pointer"
-                  >
-                    <div className="min-w-0">
-                      <p className="text-xs font-semibold text-slate-800 truncate">{u.name}</p>
-                      <p className="text-[10px] text-slate-500 truncate">{u.email}</p>
-                    </div>
-                    <ArrowRight className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-                  </button>
-                ))}
-              </div>
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+              <span>{resetSuccessMessage}</span>
             </div>
           )}
 
-          {/* Divider */}
-          <div className="relative flex items-center justify-center">
-            <div className="border-t border-slate-200 w-full" />
-            <span className="bg-white px-3 text-[11px] text-slate-400 uppercase tracking-wider shrink-0">
-              or continue with email
-            </span>
-            <div className="border-t border-slate-200 w-full" />
-          </div>
-
-          {/* 2. Email & Password Form */}
-          <form onSubmit={handleEmailSubmit} className="space-y-4">
-            {mode === 'signup' && (
+          {mode === 'forgot' ? (
+            <form onSubmit={handlePasswordResetSubmit} className="space-y-4">
               <div>
                 <label className="text-xs font-semibold text-slate-700 block mb-1">
-                  Full Name
+                  Account Email Address
                 </label>
                 <div className="relative flex items-center">
-                  <User className="w-4 h-4 text-slate-400 absolute left-3 pointer-events-none" />
+                  <Mail className="w-4 h-4 text-slate-400 absolute left-3 pointer-events-none" />
                   <input
-                    type="text"
+                    type="email"
                     required
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder="e.g. Mohamed Arman"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="name@company.com"
                     className="w-full pl-9 pr-3 py-2.5 text-xs sm:text-sm bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-blue-500 focus:bg-white transition"
                   />
                 </div>
               </div>
-            )}
 
-            <div>
-              <label className="text-xs font-semibold text-slate-700 block mb-1">
-                Email Address
-              </label>
-              <div className="relative flex items-center">
-                <Mail className="w-4 h-4 text-slate-400 absolute left-3 pointer-events-none" />
-                <input
-                  type="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="e.g. user@gmail.com or name@company.com"
-                  className="w-full pl-9 pr-3 py-2.5 text-xs sm:text-sm bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-blue-500 focus:bg-white transition"
-                />
-              </div>
-            </div>
-
-            <div>
-              <div className="flex items-center justify-between mb-1">
-                <label className="text-xs font-semibold text-slate-700">
-                  Password
-                </label>
-                {mode === 'signin' && (
-                  <button
-                    type="button"
-                    onClick={() => toast.info('Password recovery instructions sent to your email.')}
-                    className="text-[11px] text-blue-600 hover:underline cursor-pointer"
-                  >
-                    Forgot password?
-                  </button>
+              <button
+                type="submit"
+                disabled={isLoading}
+                className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs sm:text-sm shadow-md shadow-blue-500/20 transition duration-150 disabled:opacity-50 cursor-pointer"
+              >
+                {isLoading ? (
+                  <>
+                    <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    <span>Sending Reset Link...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>Send Reset Instructions</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </>
                 )}
-              </div>
-              <div className="relative flex items-center">
-                <Lock className="w-4 h-4 text-slate-400 absolute left-3 pointer-events-none" />
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Enter your password"
-                  className="w-full pl-9 pr-9 py-2.5 text-xs sm:text-sm bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-blue-500 focus:bg-white transition"
-                />
+              </button>
+
+              <div className="pt-2 border-t border-slate-100 text-center">
                 <button
                   type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 text-slate-400 hover:text-slate-600 p-0.5"
-                  title={showPassword ? 'Hide password' : 'Show password'}
-                >
-                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
-              </div>
-            </div>
-
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs sm:text-sm shadow-md shadow-blue-500/20 transition duration-150 disabled:opacity-50 cursor-pointer"
-            >
-              {isLoading ? (
-                <>
-                  <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  <span>Processing...</span>
-                </>
-              ) : (
-                <>
-                  <span>{mode === 'signin' ? 'Sign In with Email' : 'Create Account'}</span>
-                  <ArrowRight className="w-4 h-4" />
-                </>
-              )}
-            </button>
-          </form>
-
-          {/* Mode Switcher */}
-          <div className="pt-2 border-t border-slate-100 text-center text-xs text-slate-500">
-            {mode === 'signin' ? (
-              <p>
-                Don't have an account?{' '}
-                <button
-                  onClick={() => {
-                    setMode('signup');
-                    setError(null);
-                  }}
-                  className="text-blue-600 font-semibold hover:underline"
-                >
-                  Sign up free
-                </button>
-              </p>
-            ) : (
-              <p>
-                Already have an account?{' '}
-                <button
                   onClick={() => {
                     setMode('signin');
                     setError(null);
+                    setResetSuccessMessage(null);
                   }}
-                  className="text-blue-600 font-semibold hover:underline"
+                  className="inline-flex items-center gap-1.5 text-xs text-blue-600 font-semibold hover:underline cursor-pointer"
                 >
-                  Sign in
+                  <ArrowLeft className="w-3.5 h-3.5" />
+                  <span>Back to Sign In</span>
                 </button>
-              </p>
-            )}
-          </div>
+              </div>
+            </form>
+          ) : (
+            <>
+              {/* 1. Continue with Google Button */}
+              <div>
+                <button
+                  type="button"
+                  onClick={handleGoogleSubmit}
+                  disabled={isLoading}
+                  className="w-full flex items-center justify-center gap-3 py-3 px-4 rounded-2xl border border-slate-200 bg-white hover:bg-slate-50 hover:border-slate-300 text-slate-700 font-semibold text-xs sm:text-sm shadow-xs transition duration-150 disabled:opacity-50 cursor-pointer"
+                >
+                  {/* Official Google G Logo */}
+                  <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
+                    <path
+                      fill="#4285F4"
+                      d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.66-5.17 3.66-9.17z"
+                    />
+                    <path
+                      fill="#34A853"
+                      d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.33 24 12 24z"
+                    />
+                    <path
+                      fill="#FBBC05"
+                      d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 9.99 0 12s.45 3.82 1.25 5.42l4.03-3.15z"
+                    />
+                    <path
+                      fill="#EA4335"
+                      d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"
+                    />
+                  </svg>
+                  <span>Continue with Google</span>
+                </button>
+              </div>
+
+              {/* Divider */}
+              <div className="relative flex items-center justify-center">
+                <div className="border-t border-slate-200 w-full" />
+                <span className="bg-white px-3 text-[11px] text-slate-400 uppercase tracking-wider shrink-0">
+                  or continue with email
+                </span>
+                <div className="border-t border-slate-200 w-full" />
+              </div>
+
+              {/* 2. Email & Password Form */}
+              <form onSubmit={handleEmailSubmit} className="space-y-4">
+                {mode === 'signup' && (
+                  <div>
+                    <label className="text-xs font-semibold text-slate-700 block mb-1">
+                      Full Name
+                    </label>
+                    <div className="relative flex items-center">
+                      <User className="w-4 h-4 text-slate-400 absolute left-3 pointer-events-none" />
+                      <input
+                        type="text"
+                        required
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                        placeholder="Enter your full name"
+                        className="w-full pl-9 pr-3 py-2.5 text-xs sm:text-sm bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-blue-500 focus:bg-white transition"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                <div>
+                  <label className="text-xs font-semibold text-slate-700 block mb-1">
+                    Email Address
+                  </label>
+                  <div className="relative flex items-center">
+                    <Mail className="w-4 h-4 text-slate-400 absolute left-3 pointer-events-none" />
+                    <input
+                      type="email"
+                      required
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="name@company.com"
+                      className="w-full pl-9 pr-3 py-2.5 text-xs sm:text-sm bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-blue-500 focus:bg-white transition"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-xs font-semibold text-slate-700">
+                      Password
+                    </label>
+                    {mode === 'signin' && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setMode('forgot');
+                          setError(null);
+                          setResetSuccessMessage(null);
+                        }}
+                        className="text-[11px] text-blue-600 hover:underline cursor-pointer"
+                      >
+                        Forgot password?
+                      </button>
+                    )}
+                  </div>
+                  <div className="relative flex items-center">
+                    <Lock className="w-4 h-4 text-slate-400 absolute left-3 pointer-events-none" />
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      required
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder={
+                        mode === 'signup'
+                          ? '8+ chars with uppercase, lowercase & number/symbol'
+                          : 'Enter your password'
+                      }
+                      className="w-full pl-9 pr-9 py-2.5 text-xs sm:text-sm bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-blue-500 focus:bg-white transition"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 text-slate-400 hover:text-slate-600 p-0.5 cursor-pointer"
+                      title={showPassword ? 'Hide password' : 'Show password'}
+                      aria-label={showPassword ? 'Hide password' : 'Show password'}
+                    >
+                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={isLoading}
+                  className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs sm:text-sm shadow-md shadow-blue-500/20 transition duration-150 disabled:opacity-50 cursor-pointer"
+                >
+                  {isLoading ? (
+                    <>
+                      <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      <span>Processing...</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>{mode === 'signin' ? 'Sign In with Email' : 'Create Account'}</span>
+                      <ArrowRight className="w-4 h-4" />
+                    </>
+                  )}
+                </button>
+              </form>
+
+              {/* Mode Switcher */}
+              <div className="pt-2 border-t border-slate-100 text-center text-xs text-slate-500">
+                {mode === 'signin' ? (
+                  <p>
+                    Don&apos;t have an account?{' '}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMode('signup');
+                        setError(null);
+                        setResetSuccessMessage(null);
+                      }}
+                      className="text-blue-600 font-semibold hover:underline cursor-pointer"
+                    >
+                      Sign up free
+                    </button>
+                  </p>
+                ) : (
+                  <p>
+                    Already have an account?{' '}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMode('signin');
+                        setError(null);
+                        setResetSuccessMessage(null);
+                      }}
+                      className="text-blue-600 font-semibold hover:underline cursor-pointer"
+                    >
+                      Sign in
+                    </button>
+                  </p>
+                )}
+              </div>
+            </>
+          )}
         </div>
       </main>
 
@@ -389,6 +492,11 @@ export const LoginPage: React.FC = () => {
         </p>
       </footer>
 
+      {/* Onboarding Tour Modal when launched before or during sign-in */}
+      {showOnboardingTour && (
+        <OnboardingModal onClose={() => setShowOnboardingTour(false)} />
+      )}
+
       {/* Pre-auth Legal Modal */}
       {legalModal && (
         <div
@@ -401,12 +509,15 @@ export const LoginPage: React.FC = () => {
           >
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <h3 className="font-bold text-slate-900 text-base">
-                {legalModal === 'privacy' ? 'Privacy Policy & Data Protection' : 'Terms of Service & API Compliance'}
+                {legalModal === 'privacy'
+                  ? 'Privacy Policy & Data Protection'
+                  : 'Terms of Service & API Compliance'}
               </h3>
               <button
+                type="button"
                 onClick={() => setLegalModal(null)}
                 aria-label="Close legal modal"
-                className="p-1 rounded-lg text-slate-400 hover:text-slate-600"
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 cursor-pointer"
               >
                 ✕
               </button>
@@ -419,7 +530,7 @@ export const LoginPage: React.FC = () => {
                     <strong>1. Data Processing Invariants:</strong> Unified Cloud File Manager processes OAuth 2.0 PKCE credentials and directory metadata strictly for client-side file management. No raw user file contents are inspected, sold, or used for advertising or AI model training.
                   </p>
                   <p>
-                    <strong>2. Google API Services User Data Policy (Limited Use):</strong> The application's use and transfer to any other app of information received from Google APIs adheres strictly to the Google API Services User Data Policy, including the Limited Use requirements.
+                    <strong>2. Google API Services User Data Policy (Limited Use):</strong> The application&apos;s use and transfer to any other app of information received from Google APIs adheres strictly to the Google API Services User Data Policy, including the Limited Use requirements.
                   </p>
                   <p>
                     <strong>3. Multi-Account Cryptographic Isolation:</strong> All connected cloud accounts remain strictly isolated via composite keys (<code>provider:accountId:fileId</code>) and separate hardware-backed Android Keystore / WebCrypto session keys.
@@ -431,7 +542,7 @@ export const LoginPage: React.FC = () => {
               ) : (
                 <>
                   <p>
-                    <strong>1. Authorized Account Access:</strong> You certify that you are the authorized holder of any Google Drive, Microsoft OneDrive, Dropbox, or Box account you connect, and you remain bound by each provider's Terms of Service.
+                    <strong>1. Authorized Account Access:</strong> You certify that you are the authorized holder of any Google Drive, Microsoft OneDrive, Dropbox, or Box account you connect, and you remain bound by each provider&apos;s Terms of Service.
                   </p>
                   <p>
                     <strong>2. Independent Per-Account Storage Quotas:</strong> This application is a multi-account file browser and orchestration client. It does not sell storage capacity or alter provider quota boundaries; every connected account is governed independently by its upstream cloud provider.
@@ -445,8 +556,9 @@ export const LoginPage: React.FC = () => {
 
             <div className="pt-2 border-t border-slate-100 flex justify-end">
               <button
+                type="button"
                 onClick={() => setLegalModal(null)}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold"
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold cursor-pointer"
               >
                 Close
               </button>

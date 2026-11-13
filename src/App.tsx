@@ -1,4 +1,4 @@
-import React, { useMemo, Suspense, lazy } from 'react';
+import React, { useMemo } from 'react';
 import { useFileManager } from './context/FileManagerContext';
 import { useAuth } from './context/AuthContext';
 import { useTheme } from './context/ThemeContext';
@@ -13,15 +13,13 @@ import { OperationalFooter } from './components/common/OperationalFooter';
 import { MobileBottomNav } from './components/MobileBottomNav';
 import { DeviceFrameSimulator } from './components/DeviceSimulator/DeviceFrameSimulator';
 import { CookieConsentBanner } from './components/common/CookieConsentBanner';
+import { LoginPage } from './components/Auth/LoginPage';
+import { TransferDrawer } from './components/TransferDrawer';
 import { Loader2 } from 'lucide-react';
-
-const LoginPage = lazy(() => import('./components/Auth/LoginPage').then((m) => ({ default: m.LoginPage })));
-const TransferDrawer = lazy(() => import('./components/TransferDrawer').then((m) => ({ default: m.TransferDrawer })));
 
 const AuthenticatedDashboard: React.FC = () => {
   const {
     currentTab,
-    setCurrentTab,
     isMobilePreview,
     setViewMode,
     setIsMobilePreview,
@@ -73,7 +71,7 @@ const AuthenticatedDashboard: React.FC = () => {
 
   return (
     <div
-      className={`min-h-screen w-screen overflow-hidden ${
+      className={`min-h-screen h-dvh w-full overflow-hidden ${
         resolvedTheme === 'dark' ? 'dark' : ''
       } bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col font-sans transition-colors`}
     >
@@ -87,7 +85,7 @@ const AuthenticatedDashboard: React.FC = () => {
 
       {/* 2. Full Standard Responsive Layout */}
       {!isMobilePreview && (
-        <div className="flex flex-col h-screen w-screen overflow-hidden">
+        <div className="flex flex-col flex-1 min-h-0 w-full overflow-hidden">
           {/* Top Navbar */}
           <Navbar
             onOpenUpload={modalManager.openUpload}
@@ -97,15 +95,15 @@ const AuthenticatedDashboard: React.FC = () => {
           />
 
           {/* Main Layout Container */}
-          <div className="flex flex-1 overflow-hidden">
+          <div className="flex flex-1 min-h-0 overflow-hidden">
             {/* Desktop Sidebar (collapsible) */}
             <Sidebar
               onOpenAddAccount={modalManager.openAddAccount}
               onOpenTour={modalManager.openTour}
             />
 
-            {/* Main Content Area with Suspense and ErrorBoundary */}
-            <main className="flex-1 flex flex-col overflow-hidden relative">
+            {/* Main Content Area */}
+            <main className="flex-1 min-h-0 flex flex-col overflow-hidden relative bg-slate-50 dark:bg-slate-950">
               <ViewRouter
                 currentTab={currentTab}
                 onOpenUpload={modalManager.openUpload}
@@ -125,16 +123,14 @@ const AuthenticatedDashboard: React.FC = () => {
           />
 
           {/* Mobile Bottom Navigation Bar (visible on mobile screens only) */}
-          <div className="md:hidden">
+          <div className="md:hidden shrink-0">
             <MobileBottomNav onOpenMoreMenu={modalManager.openMoreDrawer} />
           </div>
         </div>
       )}
 
-      {/* Floating Transfer Monitor - Lazy Loaded */}
-      <Suspense fallback={null}>
-        <TransferDrawer />
-      </Suspense>
+      {/* Floating Transfer Monitor */}
+      <TransferDrawer />
 
       {/* Unified Modal Container */}
       <ModalContainer modalManager={modalManager} />
@@ -153,7 +149,7 @@ export const AppContent: React.FC = () => {
 
   if (isInitializing) {
     return (
-      <div className="min-h-screen w-screen flex flex-col items-center justify-center bg-slate-950 text-white font-sans">
+      <div className="min-h-screen h-dvh w-full flex flex-col items-center justify-center bg-slate-950 text-white font-sans">
         <Loader2 className="w-8 h-8 animate-spin text-blue-500 mb-3" />
         <span className="text-sm text-slate-400 font-medium">Verifying workspace session...</span>
       </div>
@@ -163,15 +159,7 @@ export const AppContent: React.FC = () => {
   if (!isAuthenticated) {
     return (
       <>
-        <Suspense
-          fallback={
-            <div className="min-h-screen w-screen flex items-center justify-center bg-slate-900 text-white">
-              <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
-            </div>
-          }
-        >
-          <LoginPage />
-        </Suspense>
+        <LoginPage />
         <CookieConsentBanner />
       </>
     );

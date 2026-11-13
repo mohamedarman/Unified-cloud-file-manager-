@@ -29,11 +29,10 @@ describe('AuthService Cryptographic Authentication', () => {
     authService.clearAllAuthData();
   });
 
-  it('initializes default vault accounts', async () => {
+  it('initializes clean vault with zero demo or pre-seeded accounts', async () => {
     await authService.ensureVaultInitialized();
     const users = authService.getAvailableUsers();
-    expect(users.length).toBeGreaterThanOrEqual(2);
-    expect(users.some((u) => u.email === 'mohamedarman536@gmail.com')).toBe(true);
+    expect(users.length).toBe(0);
   });
 
   it('registers a new user successfully with strong password', async () => {
@@ -64,24 +63,30 @@ describe('AuthService Cryptographic Authentication', () => {
     ).rejects.toThrow(AuthError);
   });
 
-  it('authenticates valid credentials successfully', async () => {
-    await authService.ensureVaultInitialized();
+  it('authenticates registered user credentials successfully', async () => {
+    await authService.register('verified@enterprise.io', 'EnterpriseAuth2026!', 'Verified User');
 
     const { user, session } = await authService.authenticate(
-      'alex.morgan@enterprise.corp',
-      'EnterpriseDemo2026!'
+      'verified@enterprise.io',
+      'EnterpriseAuth2026!'
     );
 
-    expect(user.email).toBe('alex.morgan@enterprise.corp');
+    expect(user.email).toBe('verified@enterprise.io');
     expect(session.token).toBeDefined();
   });
 
   it('rejects invalid password with generic AuthError', async () => {
-    await authService.ensureVaultInitialized();
+    await authService.register('verified@enterprise.io', 'EnterpriseAuth2026!', 'Verified User');
 
     await expect(
-      authService.authenticate('alex.morgan@enterprise.corp', 'WrongPassword123!')
+      authService.authenticate('verified@enterprise.io', 'WrongPassword123!')
     ).rejects.toThrow(AuthError);
+  });
+
+  it('rejects Google authentication when email is missing', async () => {
+    await expect(authService.authenticateWithGoogle(undefined, undefined)).rejects.toThrow(
+      AuthError
+    );
   });
 
   it('validates active session and restores user session', async () => {
@@ -97,7 +102,7 @@ describe('AuthService Cryptographic Authentication', () => {
   });
 
   it('handles logout and clears session', async () => {
-    await authService.authenticateWithGoogle('logout@gmail.com');
+    await authService.authenticateWithGoogle('logout@gmail.com', 'Logout User');
     expect(localStorage.getItem('ucfm_active_session_v1')).not.toBeNull();
 
     authService.logout();

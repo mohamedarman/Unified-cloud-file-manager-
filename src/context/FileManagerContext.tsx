@@ -186,6 +186,7 @@ interface FileManagerContextType {
   ) => void;
   clearAuditLogs: () => void;
   resetAllData: () => void;
+  loadSampleWorkspace: () => void;
 }
 
 const FileManagerContext = createContext<FileManagerContextType | undefined>(undefined);
@@ -213,7 +214,6 @@ export const FileManagerProvider: React.FC<{ children: ReactNode }> = ({ childre
 
   const auth = useAuth();
   const userId = auth?.user?.id || 'guest_user';
-  const isOwner = auth?.user?.email === 'mohamedarman536@gmail.com' || userId === 'usr_owner_001';
 
   // Scoped storage keys for strict account isolation
   const accountsKey = `ucfm_accounts_v2_${userId}`;
@@ -223,11 +223,11 @@ export const FileManagerProvider: React.FC<{ children: ReactNode }> = ({ childre
   const pendingOpsKey = `ucfm_pending_ops_v2_${userId}`;
   const auditLogsKey = `ucfm_audit_logs_v2_${userId}`;
 
-  // Default fallbacks: owner gets initial demo workspace, new accounts get genuine empty state
-  const defaultAccounts = isOwner ? INITIAL_ACCOUNTS : [];
-  const defaultFiles = isOwner ? INITIAL_FILES : [];
-  const defaultCapabilities = isOwner ? INITIAL_CAPABILITIES : {};
-  const defaultQuotas = isOwner ? INITIAL_QUOTA : {};
+  // Every user account starts with a genuine empty state until cloud accounts are connected
+  const defaultAccounts: AccountRef[] = [];
+  const defaultFiles: CloudFile[] = [];
+  const defaultCapabilities: Record<number, ProviderCapabilities> = {};
+  const defaultQuotas: Record<number, QuotaUsage> = {};
 
   // Load from scoped localStorage or defaults
   const [accounts, setAccounts] = useState<AccountRef[]>(() =>
@@ -289,10 +289,10 @@ export const FileManagerProvider: React.FC<{ children: ReactNode }> = ({ childre
     }
   }, [userId]);
 
-  // Navigation and UI state
+  // Navigation and UI state - default to 'dashboard' so user lands on main dashboard after onboarding/login
   const [activeAccountId, setActiveAccountId] = useState<LocalAccountId | 'ALL'>('ALL');
   const [activeProvider, setActiveProvider] = useState<ProviderId | 'ALL'>('ALL');
-  const [currentTab, setCurrentTab] = useState<NavigationTab>('files');
+  const [currentTab, setCurrentTab] = useState<NavigationTab>('dashboard');
   const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
   const [folderHistory, setFolderHistory] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -474,11 +474,11 @@ export const FileManagerProvider: React.FC<{ children: ReactNode }> = ({ childre
     const newId = (accounts.reduce((max, a) => Math.max(max, a.localId), 0) + 1) as LocalAccountId;
     const providerMeta = PROVIDERS[provider];
 
-    const mockToken = `ya29.a0AfH6SM${Math.random().toString(36).substring(2, 14)}`;
+    const sessionTraceId = `pkce_trace_${Math.random().toString(36).substring(2, 12)}`;
     addAuditLog(
       newId,
       'ACCOUNT_CONNECT_START',
-      `Connecting ${providerMeta.name} account ${Redactor.maskEmail(email)} with token ${mockToken}`
+      `Connecting ${providerMeta.name} account ${Redactor.maskEmail(email)} (trace: ${sessionTraceId})`
     );
 
     const newAccount: AccountRef = {
@@ -1084,6 +1084,14 @@ export const FileManagerProvider: React.FC<{ children: ReactNode }> = ({ childre
     setInspectedFile(null);
   };
 
+  const loadSampleWorkspace = () => {
+    setAccounts(INITIAL_ACCOUNTS);
+    setFiles(INITIAL_FILES);
+    setCapabilities(INITIAL_CAPABILITIES);
+    setQuotas(INITIAL_QUOTA);
+    void databaseService.seedWorkspaceIfEmpty(INITIAL_ACCOUNTS, INITIAL_FILES, INITIAL_QUOTA);
+  };
+
   const syncAccount = async (accountId: LocalAccountId) => {
     setSyncStatuses((prev) => {
       if (!prev[accountId]) return prev;
@@ -1279,6 +1287,7 @@ export const FileManagerProvider: React.FC<{ children: ReactNode }> = ({ childre
         addAuditLog,
         clearAuditLogs,
         resetAllData,
+        loadSampleWorkspace,
       }}
     >
       {children}

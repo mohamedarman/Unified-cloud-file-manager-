@@ -8,7 +8,7 @@
  * - Session token generation with 24-hour expiration and validation
  * - Session restoration on app boot and restart
  * - Multi-account registration, account listing, and account switching
- * - Zero plaintext password storage and zero credential leakage
+ * - Zero plaintext password storage, zero demo account seeding, and zero credential leakage
  */
 
 export interface AuthUser {
@@ -44,6 +44,8 @@ const STORAGE_KEY_VAULT = 'ucfm_auth_vault_v1';
 const STORAGE_KEY_SESSION = 'ucfm_active_session_v1';
 const PBKDF2_ITERATIONS = 100_000;
 const SESSION_DURATION_MS = 24 * 60 * 60 * 1000; // 24 hours
+const LEGACY_DEMO_USER_IDS = new Set(['usr_owner_001', 'usr_demo_002']);
+const LEGACY_DEMO_EMAILS = new Set(['alex.morgan@enterprise.corp']);
 
 // Helper to access standard Web Crypto
 function getCrypto(): Crypto {
@@ -88,7 +90,11 @@ function timingSafeEqualHex(a: string, b: string): boolean {
 /**
  * Derives PBKDF2-HMAC-SHA256 key from a password and salt.
  */
-async function derivePasswordHash(password: string, salt: Uint8Array, iterations = PBKDF2_ITERATIONS): Promise<string> {
+async function derivePasswordHash(
+  password: string,
+  salt: Uint8Array,
+  iterations = PBKDF2_ITERATIONS
+): Promise<string> {
   const cryptoObj = getCrypto();
   const encoder = new TextEncoder();
   const passwordKey = await cryptoObj.subtle.importKey(
@@ -140,7 +146,8 @@ class AuthService {
    */
   public validateEmail(email: string): string {
     const trimmed = (email || '').trim().toLowerCase();
-    const emailRegex = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/;
+    const emailRegex =
+      /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/;
     if (!trimmed || !emailRegex.test(trimmed)) {
       throw new AuthError('Please enter a valid email address.', 'INVALID_EMAIL');
     }
@@ -162,7 +169,10 @@ class AuthService {
       throw new AuthError('Password must be at least 8 characters long.', 'WEAK_PASSWORD');
     }
     if (password.length > 128) {
-      throw new AuthError('Password exceeds maximum allowable length (128 characters).', 'PASSWORD_TOO_LONG');
+      throw new AuthError(
+        'Password exceeds maximum allowable length (128 characters).',
+        'PASSWORD_TOO_LONG'
+      );
     }
     const hasLower = /[a-z]/.test(password);
     const hasUpper = /[A-Z]/.test(password);
@@ -201,47 +211,22 @@ class AuthService {
   }
 
   /**
-   * Initializes default seed accounts if vault is empty so owner and demo logins exist.
+   * Initializes the cryptographic user vault and purges any legacy pre-seeded demo accounts.
+   * No demo or placeholder users are ever seeded automatically.
    */
   public async ensureVaultInitialized(): Promise<void> {
     if (this.vaultInitialized) return;
     const vault = this.loadVault();
 
-    if (vault.size === 0) {
-      // Seed Primary User Account
-      const primaryEmail = 'mohamedarman536@gmail.com';
-      const primarySalt = generateRandomBytes(16);
-      const primaryHash = await derivePasswordHash('UnifiedCloud2026!', primarySalt);
+    let modified = false;
+    for (const [email, record] of vault.entries()) {
+      if (LEGACY_DEMO_USER_IDS.has(record.id) || LEGACY_DEMO_EMAILS.has(email)) {
+        vault.delete(email);
+        modified = true;
+      }
+    }
 
-      const primaryUser: StoredUserRecord = {
-        id: 'usr_owner_001',
-        email: primaryEmail,
-        name: 'Mohamed Arman',
-        saltHex: bufferToHex(primarySalt.buffer),
-        passwordHashHex: primaryHash,
-        iterations: PBKDF2_ITERATIONS,
-        provider: 'google',
-        createdAt: Date.now() - 30 * 24 * 60 * 60 * 1000,
-      };
-
-      // Seed Demo Workspace Account
-      const demoEmail = 'alex.morgan@enterprise.corp';
-      const demoSalt = generateRandomBytes(16);
-      const demoHash = await derivePasswordHash('EnterpriseDemo2026!', demoSalt);
-
-      const demoUser: StoredUserRecord = {
-        id: 'usr_demo_002',
-        email: demoEmail,
-        name: 'Alex Morgan',
-        saltHex: bufferToHex(demoSalt.buffer),
-        passwordHashHex: demoHash,
-        iterations: PBKDF2_ITERATIONS,
-        provider: 'email',
-        createdAt: Date.now() - 60 * 24 * 60 * 60 * 1000,
-      };
-
-      vault.set(primaryEmail, primaryUser);
-      vault.set(demoEmail, demoUser);
+    if (modified) {
       this.saveVault(vault);
     }
 
@@ -268,7 +253,10 @@ class AuthService {
 
     const vault = this.loadVault();
     if (vault.has(email)) {
-      throw new AuthError('An account with this email address is already registered.', 'DUPLICATE_EMAIL');
+      throw new AuthError(
+        'An account with this email address is already registered.',
+        'DUPLICATE_EMAIL'
+      );
     }
 
     const salt = generateRandomBytes(16);
@@ -338,7 +326,7 @@ class AuthService {
 
   /**
    * Google OAuth / Workspace Identity Provider Login.
-   * Auto-links or creates verified user profile.
+   * Requires a verified email from Google OAuth — never falls back to a demo account.
    */
   public async authenticateWithGoogle(
     rawEmail?: string,
@@ -346,7 +334,14 @@ class AuthService {
   ): Promise<{ user: AuthUser; session: AuthSession }> {
     await this.ensureVaultInitialized();
 
-    const email = this.validateEmail(rawEmail || 'mohamedarman536@gmail.com');
+    if (!rawEmail || !rawEmail.trim()) {
+      throw new AuthError(
+        'Google authentication requires a verified Google account email.',
+        'OAUTH_EMAIL_MISSING'
+      );
+    }
+
+    const email = this.validateEmail(rawEmail);
     const vault = this.loadVault();
     let record = vault.get(email);
 
@@ -444,7 +439,9 @@ class AuthService {
   /**
    * Switches the active workspace session to another registered user account.
    */
-  public async switchAccount(targetUserId: string): Promise<{ user: AuthUser; session: AuthSession }> {
+  public async switchAccount(
+    targetUserId: string
+  ): Promise<{ user: AuthUser; session: AuthSession }> {
     await this.ensureVaultInitialized();
 
     const vault = this.loadVault();
@@ -472,7 +469,9 @@ class AuthService {
 
   public getAvailableUsers(): AuthUser[] {
     const vault = this.loadVault();
-    return Array.from(vault.values()).map((r) => this.toAuthUser(r));
+    return Array.from(vault.values())
+      .filter((r) => !LEGACY_DEMO_USER_IDS.has(r.id) && !LEGACY_DEMO_EMAILS.has(r.email))
+      .map((r) => this.toAuthUser(r));
   }
 
   public logout(): void {
@@ -495,7 +494,6 @@ class AuthService {
     };
     try {
       localStorage.setItem(STORAGE_KEY_SESSION, JSON.stringify(session));
-      // Keep ucfm_auth_user in sync for legacy listeners
       const vault = this.loadVault();
       for (const rec of vault.values()) {
         if (rec.id === userId) {
