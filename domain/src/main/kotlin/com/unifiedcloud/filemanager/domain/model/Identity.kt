@@ -29,6 +29,9 @@ value class ProviderId(val value: String) {
 
     companion object {
         val GOOGLE_DRIVE = ProviderId("GOOGLE_DRIVE")
+        val ONE_DRIVE = ProviderId("ONE_DRIVE")
+        val DROPBOX = ProviderId("DROPBOX")
+        val BOX = ProviderId("BOX")
     }
 
     override fun toString(): String = value

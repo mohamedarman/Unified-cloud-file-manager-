@@ -89,8 +89,16 @@ function sanitizeForFirestore<T>(obj: T): T {
   ) as T;
 }
 
-function getActiveFirestoreUid(): string | null {
-  return auth.currentUser?.uid ?? null;
+function getActiveFirestoreUid(logIfMissing = false, subPath = 'users/<unauthenticated>'): string | null {
+  const uid = auth.currentUser?.uid ?? null;
+  if (!uid && logIfMissing) {
+    handleFirestoreError(
+      new Error('Firestore write skipped: no active Firebase Auth uid.'),
+      OperationType.WRITE,
+      subPath
+    );
+  }
+  return uid;
 }
 
 function encodeDocId(rawKey: string): string {
@@ -111,7 +119,7 @@ export const databaseService = {
   },
 
   async syncUserProfile(user: AuthUser): Promise<void> {
-    const uid = getActiveFirestoreUid();
+    const uid = getActiveFirestoreUid(true, 'users/<unauthenticated>');
     if (!uid) return;
     const path = `users/${uid}`;
     try {

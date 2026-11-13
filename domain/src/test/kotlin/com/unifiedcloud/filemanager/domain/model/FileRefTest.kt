@@ -131,3 +131,78 @@ class QuotaUsageTest {
         assertTrue(usage.describe().contains("Google Drive"))
     }
 }
+
+class FolderHierarchyValidatorTest {
+    private val folderA = ProviderFileId("folder_a")
+    private val folderB = ProviderFileId("folder_b")
+    private val folderC = ProviderFileId("folder_c")
+    private val folderD = ProviderFileId("folder_d")
+
+    private val parents =
+        mapOf(
+            folderB to folderA,
+            folderC to folderB,
+        )
+
+    @Test
+    fun `moving a folder into itself is blocked as a cycle`() {
+        assertTrue(
+            FolderHierarchyValidator.wouldCreateCycle(folderA, folderA) { parents[it] },
+        )
+    }
+
+    @Test
+    fun `moving a folder into a direct or indirect descendant is blocked as a cycle`() {
+        assertTrue(
+            FolderHierarchyValidator.wouldCreateCycle(folderA, folderB) { parents[it] },
+        )
+        assertTrue(
+            FolderHierarchyValidator.wouldCreateCycle(folderA, folderC) { parents[it] },
+        )
+    }
+
+    @Test
+    fun `moving a folder into an unrelated folder or root is allowed`() {
+        assertFalse(
+            FolderHierarchyValidator.wouldCreateCycle(folderA, folderD) { parents[it] },
+        )
+        assertFalse(
+            FolderHierarchyValidator.wouldCreateCycle(folderB, null) { parents[it] },
+        )
+    }
+}
+
+class ProviderCapabilitiesTest {
+    @Test
+    fun `only Google Drive supports canExport`() {
+        val driveCaps = ProviderCapabilities.forProvider(ProviderId.GOOGLE_DRIVE, hasWriteScope = true)
+        val oneDriveCaps = ProviderCapabilities.forProvider(ProviderId.ONE_DRIVE, hasWriteScope = true)
+        val dropboxCaps = ProviderCapabilities.forProvider(ProviderId.DROPBOX, hasWriteScope = true)
+        val boxCaps = ProviderCapabilities.forProvider(ProviderId.BOX, hasWriteScope = true)
+
+        assertEquals(true, driveCaps.canExport)
+        assertEquals(false, oneDriveCaps.canExport)
+        assertEquals(false, dropboxCaps.canExport)
+        assertEquals(false, boxCaps.canExport)
+    }
+
+    @Test
+    fun `Dropbox does not claim canStar`() {
+        val dropboxCaps = ProviderCapabilities.forProvider(ProviderId.DROPBOX, hasWriteScope = true)
+        val driveCaps = ProviderCapabilities.forProvider(ProviderId.GOOGLE_DRIVE, hasWriteScope = true)
+
+        assertEquals(false, dropboxCaps.canStar)
+        assertEquals(true, driveCaps.canStar)
+    }
+
+    @Test
+    fun `read-only scope disables write capabilities`() {
+        val readOnlyCaps = ProviderCapabilities.forProvider(ProviderId.ONE_DRIVE, hasWriteScope = false)
+
+        assertFalse(readOnlyCaps.canWrite)
+        assertEquals(false, readOnlyCaps.canCreateFolders)
+        assertEquals(false, readOnlyCaps.canRename)
+        assertEquals(false, readOnlyCaps.canTrash)
+        assertEquals(true, readOnlyCaps.canReadFiles)
+    }
+}

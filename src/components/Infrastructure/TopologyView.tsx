@@ -291,17 +291,19 @@ export const TopologyView: React.FC = () => {
             <span>Conference Diagram</span>
           </button>
 
-          <button
-            onClick={() => setActiveTab('data_flow_simulator')}
-            className={`px-3 py-1.5 rounded-lg transition cursor-pointer flex items-center gap-1.5 ${
-              activeTab === 'data_flow_simulator'
-                ? 'bg-blue-600 text-white font-semibold shadow-2xs'
-                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-            }`}
-          >
-            <Play className="w-3.5 h-3.5 fill-current" />
-            <span>Flow Simulator</span>
-          </button>
+          {import.meta.env.DEV && (
+            <button
+              onClick={() => setActiveTab('data_flow_simulator')}
+              className={`px-3 py-1.5 rounded-lg transition cursor-pointer flex items-center gap-1.5 ${
+                activeTab === 'data_flow_simulator'
+                  ? 'bg-blue-600 text-white font-semibold shadow-2xs'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+              }`}
+            >
+              <Play className="w-3.5 h-3.5 fill-current" />
+              <span>Flow Simulator (Dev)</span>
+            </button>
+          )}
         </div>
 
         {/* Action Controls: Zoom, Export, Fullscreen */}
@@ -375,7 +377,7 @@ export const TopologyView: React.FC = () => {
                       <span>Clean Modular Architecture & Security Invariants</span>
                     </h2>
                     <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                      Strict Multi-Account Isolation, Keystore Cryptography, and Zero-Storage Management
+                      Strict Multi-Account Isolation, Keystore Cryptography, and Direct Provider Quota Enforcement
                     </p>
                   </div>
 
@@ -586,7 +588,7 @@ export const TopologyView: React.FC = () => {
                       Conference Architecture Poster · Technical Paper 2026
                     </span>
                     <h2 className="text-xl font-bold tracking-tight text-white">
-                      Zero-Storage Multi-Cloud Orchestration & Governance Protocol
+                      Direct-to-Provider Multi-Cloud Orchestration & Governance Protocol
                     </h2>
                   </div>
 
@@ -603,9 +605,9 @@ export const TopologyView: React.FC = () => {
                     <div className="w-10 h-10 rounded-xl bg-blue-500/20 border border-blue-400/30 flex items-center justify-center text-blue-400">
                       <Lock className="w-5 h-5" />
                     </div>
-                    <h3 className="font-bold text-white text-sm">1. Strict Zero-Storage Invariant</h3>
+                    <h3 className="font-bold text-white text-sm">1. Direct Provider Quota Invariant</h3>
                     <p className="text-xs text-slate-300 leading-relaxed">
-                      All file contents stream strictly between the client and the respective authorized provider. The central proxy neither pools, caches, nor resells third-party cloud storage.
+                      All file contents stream directly between the client and the authorized provider. Local storage is used only for metadata indices and explicit user-pinned offline files.
                     </p>
                   </div>
 
@@ -615,7 +617,7 @@ export const TopologyView: React.FC = () => {
                     </div>
                     <h3 className="font-bold text-white text-sm">2. Keystore-Backed Isolation</h3>
                     <p className="text-xs text-slate-300 leading-relaxed">
-                      Every authorized account maintains an isolated cryptographic token bucket. When an account is disconnected, all local indices and tokens are wiped instantly.
+                      Every authorized account maintains an isolated cryptographic token bucket. When an account is disconnected, all local indices, pinned files, and tokens are wiped and revoked.
                     </p>
                   </div>
 
@@ -625,7 +627,7 @@ export const TopologyView: React.FC = () => {
                     </div>
                     <h3 className="font-bold text-white text-sm">3. Quota & Rate Governance</h3>
                     <p className="text-xs text-slate-300 leading-relaxed">
-                      The QuotaGovernor ensures fair concurrent permits (max 4 per account), preventing rate-limit throttling and providing durable offline reconciliation.
+                      The QuotaGovernor ensures fair concurrent permits (max 4 per account) with a FIFO wait queue, preventing rate-limit throttling and providing durable offline reconciliation.
                     </p>
                   </div>
                 </div>
@@ -633,7 +635,7 @@ export const TopologyView: React.FC = () => {
                 {/* Footer specs */}
                 <div className="p-4 rounded-xl bg-black/40 border border-white/10 flex flex-wrap items-center justify-between gap-3 text-xs font-mono text-slate-300">
                   <span>Architecture Citation: Architecture.md (RFC 7636 PKCE · Google Drive API v3 · Microsoft Graph API)</span>
-                  <span className="text-emerald-400">✓ SOC2 Type II Certified Invariant</span>
+                  <span className="text-emerald-400">✓ Keystore AES-256-GCM & OAuth 2.0 PKCE Enforced</span>
                 </div>
               </div>
             </div>

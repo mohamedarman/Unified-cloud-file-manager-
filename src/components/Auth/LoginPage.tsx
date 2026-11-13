@@ -189,7 +189,7 @@ export const LoginPage: React.FC = () => {
 
           <span className="text-[11px] font-medium text-blue-700 bg-blue-50 px-2.5 py-1 rounded-full border border-blue-200 flex items-center gap-1.5">
             <ShieldCheck className="w-3.5 h-3.5 text-blue-600" />
-            <span className="hidden sm:inline">Zero-Storage Architecture</span>
+            <span className="hidden sm:inline">Keystore & OAuth 2.0 PKCE</span>
             <span className="sm:hidden">Secure</span>
           </span>
         </div>

@@ -8,6 +8,7 @@ import {
   sendPasswordResetEmail,
   signOut,
   onAuthStateChanged,
+  updateProfile,
   User,
 } from 'firebase/auth';
 import { authService, AuthUser, AuthSession } from '../services/authService';
@@ -22,7 +23,7 @@ interface AuthContextType {
   isInitializing: boolean;
   sessionError: string | null;
   availableUsers: AuthUser[];
-  loginWithGoogle: (email?: string, name?: string) => Promise<void>;
+  loginWithGoogle: () => Promise<void>;
   loginWithEmail: (email: string, password: string) => Promise<void>;
   signupWithEmail: (email: string, password: string, name: string) => Promise<void>;
   sendPasswordReset: (email: string) => Promise<void>;
@@ -50,57 +51,22 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   }, []);
 
-  // Restore session on mount and listen to Firebase Auth state changes
   useEffect(() => {
     let isMounted = true;
 
-    const restoreSession = async () => {
+    const unsubscribeFirebase = onAuthStateChanged(firebaseAuth, async (fbUser: User | null) => {
+      if (!isMounted) return;
       try {
         await authService.ensureVaultInitialized();
-        const active = await authService.validateSession();
-
-        if (!isMounted) return;
-
-        if (active) {
-          setUser(active.user);
-          setSession(active.session);
-          setSessionError(null);
-          void databaseService.syncUserProfile(active.user);
-        } else {
-          const rawSession = localStorage.getItem('ucfm_active_session_v1');
-          if (rawSession) {
-            setSessionError('Your security session has expired. Please sign in again.');
-            authService.logout();
-          }
-          setUser(null);
-          setSession(null);
-        }
-      } catch (err: unknown) {
-        console.error('Session restoration failed:', err);
-        if (isMounted) {
-          setUser(null);
-          setSession(null);
-          setSessionError('Security session invalid. Please log in.');
-        }
-      } finally {
-        if (isMounted) {
-          refreshAvailableUsers();
-          setIsInitializing(false);
-        }
-      }
-    };
-
-    void restoreSession();
-
-    const unsubscribeFirebase = onAuthStateChanged(firebaseAuth, async (fbUser: User | null) => {
-      if (!isMounted || !fbUser) return;
-      try {
-        const currentActive = await authService.validateSession();
-        if (!currentActive && fbUser.email) {
-          const res = await authService.authenticateWithGoogle(
-            fbUser.email,
-            fbUser.displayName || undefined
-          );
+        if (fbUser && fbUser.email) {
+          const idToken = await fbUser.getIdToken();
+          const res = await authService.authenticateFromVerifiedOAuth({
+            uid: fbUser.uid,
+            email: fbUser.email,
+            displayName: fbUser.displayName,
+            idToken,
+            photoUrl: fbUser.photoURL,
+          });
           if (isMounted) {
             setUser(res.user);
             setSession(res.session);
@@ -108,106 +74,114 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             refreshAvailableUsers();
             void databaseService.syncUserProfile(res.user);
           }
+        } else {
+          const active = await authService.validateSession();
+          if (isMounted) {
+            if (active) {
+              setUser(active.user);
+              setSession(active.session);
+              setSessionError(null);
+            } else {
+              setUser(null);
+              setSession(null);
+            }
+          }
         }
-      } catch (e) {
-        console.warn('Firebase auth state sync warning:', e);
+      } catch (err) {
+        console.error('Auth state initialization failed:', err);
+        if (isMounted) {
+          setUser(null);
+          setSession(null);
+        }
+      } finally {
+        if (isMounted) {
+          refreshAvailableUsers();
+          setIsInitializing(false);
+        }
       }
     });
-
-    const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === 'ucfm_active_session_v1' || e.key === 'ucfm_auth_user') {
-        void restoreSession();
-      }
-    };
-    window.addEventListener('storage', handleStorageChange);
 
     return () => {
       isMounted = false;
       unsubscribeFirebase();
-      window.removeEventListener('storage', handleStorageChange);
     };
   }, [refreshAvailableUsers]);
 
-  const loginWithGoogle = async (email?: string, name?: string): Promise<void> => {
+  const loginWithGoogle = async (): Promise<void> => {
     setSessionError(null);
     try {
-      let resolvedEmail = email;
-      let resolvedName = name;
-
       const isAndroidWebView =
         typeof window !== 'undefined' &&
         (window.location.hostname === 'appassets.androidplatform.net' ||
           /wv|Version\/\d+\.\d+.*Chrome/.test(navigator.userAgent));
 
-      if (!resolvedEmail) {
-        if (isAndroidWebView) {
-          throw new Error(
-            'Google OAuth browser popups are blocked inside embedded Android WebView (RFC 8252). Please sign in or create an account using Email & Password below, or configure Android AppAuth / Custom Tabs.'
-          );
-        }
-        try {
-          const provider = new GoogleAuthProvider();
-          provider.setCustomParameters({ prompt: 'select_account' });
-          const result = await signInWithPopup(firebaseAuth, provider);
-          resolvedEmail = result.user.email || undefined;
-          resolvedName = result.user.displayName || undefined;
-        } catch (popupErr: unknown) {
-          const code = (popupErr as { code?: string })?.code || '';
-          if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request') {
-            throw new Error('Google Sign-In popup was closed before completing authentication.');
-          }
-          if (
-            code === 'auth/unauthorized-domain' ||
-            code === 'auth/operation-not-supported-in-this-environment'
-          ) {
-            throw new Error(
-              'Google OAuth popup is not authorized for this domain in Firebase Console. Please sign in or register using Email & Password below.'
-            );
-          }
-          const message =
-            popupErr instanceof Error ? popupErr.message : 'Google OAuth authentication failed.';
-          throw new Error(message);
-        }
+      if (isAndroidWebView) {
+        throw new Error(
+          'Google OAuth browser popups are blocked inside embedded Android WebView (RFC 8252). Please sign in using Email & Password below.'
+        );
       }
 
-      const res = await authService.authenticateWithGoogle(resolvedEmail, resolvedName);
+      const provider = new GoogleAuthProvider();
+      provider.setCustomParameters({ prompt: 'select_account' });
+      const result = await signInWithPopup(firebaseAuth, provider);
+      if (!result.user.email) {
+        throw new Error('Google OAuth did not return a verified account email.');
+      }
+      const idToken = await result.user.getIdToken();
+      const res = await authService.authenticateFromVerifiedOAuth({
+        uid: result.user.uid,
+        email: result.user.email,
+        displayName: result.user.displayName,
+        idToken,
+        photoUrl: result.user.photoURL,
+      });
       setUser(res.user);
       setSession(res.session);
       refreshAvailableUsers();
-      void databaseService.syncUserProfile(res.user);
+      await databaseService.syncUserProfile(res.user);
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Google Sign-In failed.';
+      const code = (err as { code?: string })?.code || '';
+      let msg = err instanceof Error ? err.message : 'Google Sign-In failed.';
+      if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request') {
+        msg = 'Google Sign-In popup was closed before completing authentication.';
+      } else if (
+        code === 'auth/unauthorized-domain' ||
+        code === 'auth/operation-not-supported-in-this-environment'
+      ) {
+        msg =
+          'Google OAuth popup is not authorized for this domain in Firebase Console. Please sign in or register using Email & Password below.';
+      }
       setSessionError(msg);
-      throw err;
+      throw new Error(msg);
     }
   };
 
   const loginWithEmail = async (email: string, password: string): Promise<void> => {
     setSessionError(null);
     try {
+      const normalizedEmail = authService.validateEmail(email);
       let res: { user: AuthUser; session: AuthSession };
       try {
-        res = await authService.authenticate(email, password);
-      } catch (vaultErr) {
-        try {
-          const fbCred = await signInWithEmailAndPassword(firebaseAuth, email, password);
-          res = await authService.authenticateWithGoogle(
-            fbCred.user.email || email,
-            fbCred.user.displayName || email.split('@')[0]
-          );
-        } catch {
-          throw vaultErr;
-        }
-      }
-
-      // Best-effort Firebase Auth session synchronization for Firestore rules
-      try {
-        await signInWithEmailAndPassword(firebaseAuth, email, password);
-      } catch {
-        try {
-          await createUserWithEmailAndPassword(firebaseAuth, email, password);
-        } catch {
-          // Ignore if offline or email already linked to Google provider
+        const fbCred = await signInWithEmailAndPassword(firebaseAuth, normalizedEmail, password);
+        const idToken = await fbCred.user.getIdToken();
+        res = await authService.authenticateFromVerifiedOAuth({
+          uid: fbCred.user.uid,
+          email: fbCred.user.email || normalizedEmail,
+          displayName: fbCred.user.displayName || normalizedEmail.split('@')[0],
+          idToken,
+        });
+      } catch (fbErr: unknown) {
+        const fbCode = (fbErr as { code?: string })?.code || '';
+        if (
+          fbCode === 'auth/invalid-credential' ||
+          fbCode === 'auth/wrong-password' ||
+          fbCode === 'auth/user-not-found'
+        ) {
+          res = await authService.authenticate(normalizedEmail, password);
+        } else if (fbCode === 'auth/network-request-failed') {
+          res = await authService.authenticate(normalizedEmail, password);
+        } else {
+          res = await authService.authenticate(normalizedEmail, password);
         }
       }
 
@@ -225,15 +199,27 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const signupWithEmail = async (email: string, password: string, name: string): Promise<void> => {
     setSessionError(null);
     try {
-      const res = await authService.register(email, password, name);
+      const normalizedEmail = authService.validateEmail(email);
+      authService.validatePassword(password);
 
-      // Best-effort Firebase Auth user creation for Firestore sync
+      let firebaseUid: string | undefined;
       try {
-        await createUserWithEmailAndPassword(firebaseAuth, email, password);
-      } catch {
-        // Ignore if offline or restricted in Android WebView
+        const cred = await createUserWithEmailAndPassword(firebaseAuth, normalizedEmail, password);
+        firebaseUid = cred.user.uid;
+        if (name.trim()) {
+          await updateProfile(cred.user, { displayName: name.trim() });
+        }
+      } catch (fbErr: unknown) {
+        const fbCode = (fbErr as { code?: string })?.code || '';
+        if (fbCode === 'auth/email-already-in-use') {
+          throw new Error('An account with this email address is already registered.');
+        }
+        if (fbCode && fbCode !== 'auth/network-request-failed') {
+          throw fbErr instanceof Error ? fbErr : new Error(String(fbErr));
+        }
       }
 
+      const res = await authService.register(normalizedEmail, password, name, firebaseUid);
       setUser(res.user);
       setSession(res.session);
       refreshAvailableUsers();
@@ -248,15 +234,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const sendPasswordReset = async (email: string): Promise<void> => {
     setSessionError(null);
     const normalizedEmail = authService.validateEmail(email);
-    try {
-      await sendPasswordResetEmail(firebaseAuth, normalizedEmail);
-    } catch (err: unknown) {
-      const code = (err as { code?: string })?.code || '';
-      if (code === 'auth/invalid-email') {
-        throw new Error('Please enter a valid email address.');
-      }
-      // For offline or local-only accounts in WebView, complete gracefully without leaking account existence
-    }
+    await sendPasswordResetEmail(firebaseAuth, normalizedEmail);
   };
 
   const switchAccount = async (targetUserId: string): Promise<void> => {
@@ -270,7 +248,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const logout = async () => {
     try {
-      await signOut(firebaseAuth).catch(() => undefined);
+      await signOut(firebaseAuth);
+    } catch (err) {
+      console.warn('Firebase signOut error:', err);
     } finally {
       authService.logout();
       setUser(null);

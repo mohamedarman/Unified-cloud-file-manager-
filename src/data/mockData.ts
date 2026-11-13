@@ -438,7 +438,7 @@ export const INITIAL_FILES: CloudFile[] = [
     isOwnedByUser: true,
     isStarred: true,
     isTrashed: false,
-    previewText: 'Podcast Recording: Multi-Cloud Unified Access & Zero-Storage Architectures (Duration: 32m 40s)',
+    previewText: 'Podcast Recording: Multi-Cloud Unified Access & Direct Provider Streaming (Duration: 32m 40s)',
     durationSeconds: 1960,
   },
   {

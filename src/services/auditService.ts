@@ -24,11 +24,15 @@ class AuditService {
     rawMessage: string,
     severity: 'INFO' | 'WARN' | 'ERROR' = 'INFO'
   ): AuditLogEntry {
-    const correlationTag = Redactor.fileRefTag(accountId, `${action}-${Date.now()}`);
+    const uuid =
+      typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+        ? crypto.randomUUID()
+        : `${Date.now()}`;
+    const correlationTag = Redactor.fileRefTag(accountId, `${action}-${uuid}`);
     const redactedMessage = Redactor.scrub(rawMessage);
 
     const entry: AuditLogEntry = {
-      id: `audit-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
+      id: `audit_${uuid}`,
       timestamp: Date.now(),
       accountId,
       action,

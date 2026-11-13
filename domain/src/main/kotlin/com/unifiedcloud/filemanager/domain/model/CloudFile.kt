@@ -28,6 +28,8 @@ data class CloudFile(
      * for a trashed file at all.
      */
     val isTrashed: Boolean = false,
+    val webViewLink: String? = null,
+    val thumbnailLink: String? = null,
 ) {
     init {
         require(name.isNotEmpty()) { "CloudFile.name must not be empty" }
@@ -56,6 +58,37 @@ data class CloudFile(
      */
     val isDownloadableAsBytes: Boolean
         get() = !isGoogleNative && !isFolder
+}
+
+/**
+ * Validates folder hierarchy operations to prevent moving a folder into itself
+ * or any of its descendants.
+ */
+object FolderHierarchyValidator {
+    private const val MAX_ANCESTOR_DEPTH = 256
+
+    /**
+     * Returns true if moving [folderId] into [targetParentId] would create a cycle
+     * (either moving into itself or into a descendant of [folderId]).
+     */
+    fun wouldCreateCycle(
+        folderId: ProviderFileId,
+        targetParentId: ProviderFileId?,
+        parentLookup: (ProviderFileId) -> ProviderFileId?,
+    ): Boolean {
+        if (targetParentId == null) return false
+        if (folderId == targetParentId) return true
+        val visited = mutableSetOf<ProviderFileId>()
+        var cursor: ProviderFileId? = targetParentId
+        var depth = 0
+        while (cursor != null && depth < MAX_ANCESTOR_DEPTH) {
+            if (cursor == folderId) return true
+            if (!visited.add(cursor)) break
+            cursor = parentLookup(cursor)
+            depth++
+        }
+        return false
+    }
 }
 
 /**

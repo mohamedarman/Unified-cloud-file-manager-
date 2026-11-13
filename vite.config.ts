@@ -10,13 +10,26 @@ export default defineConfig({
     host: '0.0.0.0',
     port: 3000,
     allowedHosts: true,
+    hmr: false,
+    watch: {
+      ignored: [
+        '**/app/**',
+        '**/domain/**',
+        '**/core/**',
+        '**/data/**',
+        '**/cloud/**',
+        '**/gradle/**',
+        '**/.gradle/**',
+        '**/build/**',
+        '**/dist/**',
+      ],
+    },
   },
   build: {
     chunkSizeWarningLimit: 600,
     rollupOptions: {
       output: {
         manualChunks: {
-          'vendor-react': ['react', 'react-dom'],
           'vendor-icons': ['lucide-react'],
           'vendor-charts': ['recharts'],
         },

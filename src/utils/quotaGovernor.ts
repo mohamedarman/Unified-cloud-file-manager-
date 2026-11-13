@@ -17,6 +17,7 @@ export class QuotaGovernor {
   private inFlightTotal = 0;
   private windowStart = Date.now();
   private consumedInWindow = 0;
+  private waiters: Array<() => void> = [];
 
   constructor(
     public readonly perAccountLimit: number = ProvisionalBudgets.PER_ACCOUNT_LIMIT,
@@ -52,6 +53,45 @@ export class QuotaGovernor {
     return { granted: true };
   }
 
+  /**
+   * Queues the caller in FIFO order until a concurrency slot opens for `accountId`
+   * or `maxWaitMillis` elapses, preventing multi-file uploads from failing immediately.
+   */
+  public async acquireQueued(
+    accountId: LocalAccountId,
+    maxWaitMillis = 30_000
+  ): Promise<AdmissionResult> {
+    let decision = this.tryAcquire(accountId);
+    if (decision.granted || decision.reason === 'RATE_BUDGET_EXHAUSTED') {
+      return decision;
+    }
+
+    const deadline = Date.now() + maxWaitMillis;
+    while (!decision.granted) {
+      const remaining = deadline - Date.now();
+      if (remaining <= 0) {
+        return decision;
+      }
+      await new Promise<void>((resolve) => {
+        const timer = setTimeout(() => {
+          const idx = this.waiters.indexOf(wake);
+          if (idx >= 0) this.waiters.splice(idx, 1);
+          resolve();
+        }, remaining);
+        const wake = () => {
+          clearTimeout(timer);
+          resolve();
+        };
+        this.waiters.push(wake);
+      });
+      decision = this.tryAcquire(accountId);
+      if (!decision.granted && decision.reason === 'RATE_BUDGET_EXHAUSTED') {
+        return decision;
+      }
+    }
+    return decision;
+  }
+
   public release(accountId: LocalAccountId): void {
     const current = this.inFlightByAccount.get(accountId) || 0;
     if (current <= 0) return;
@@ -62,6 +102,11 @@ export class QuotaGovernor {
       this.inFlightByAccount.set(accountId, current - 1);
     }
     this.inFlightTotal = Math.max(0, this.inFlightTotal - 1);
+
+    const pending = this.waiters.splice(0, this.waiters.length);
+    for (const wake of pending) {
+      wake();
+    }
   }
 
   public snapshot(): QuotaSnapshot {
@@ -86,6 +131,22 @@ export class QuotaGovernor {
 
   public async withPermit<T>(accountId: LocalAccountId, task: () => Promise<T>): Promise<T | null> {
     const admission = this.tryAcquire(accountId);
+    if (!admission.granted) {
+      return null;
+    }
+    try {
+      return await task();
+    } finally {
+      this.release(accountId);
+    }
+  }
+
+  public async withQueuedPermit<T>(
+    accountId: LocalAccountId,
+    task: () => Promise<T>,
+    maxWaitMillis = 30_000
+  ): Promise<T | null> {
+    const admission = await this.acquireQueued(accountId, maxWaitMillis);
     if (!admission.granted) {
       return null;
     }

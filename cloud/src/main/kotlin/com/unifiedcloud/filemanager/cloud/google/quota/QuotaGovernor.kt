@@ -1,6 +1,8 @@
 package com.unifiedcloud.filemanager.cloud.google.quota
 
 import com.unifiedcloud.filemanager.domain.model.LocalAccountId
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * Result of asking the governor for permission to make a request.
@@ -166,6 +168,7 @@ class QuotaGovernor(
     private val lock = Any()
     private val inFlightByAccount = mutableMapOf<LocalAccountId, Int>()
     private var inFlightTotal = 0
+    private val waiters = ArrayDeque<CompletableDeferred<Unit>>()
 
     /**
      * Reserves capacity for one request by [accountId].
@@ -212,6 +215,7 @@ class QuotaGovernor(
      * for the rest of the process.
      */
     fun release(accountId: LocalAccountId) {
+        val toWake = mutableListOf<CompletableDeferred<Unit>>()
         synchronized(lock) {
             val forAccount = inFlightByAccount[accountId] ?: 0
             if (forAccount <= 0) return
@@ -221,7 +225,51 @@ class QuotaGovernor(
                 inFlightByAccount[accountId] = forAccount - 1
             }
             inFlightTotal = (inFlightTotal - 1).coerceAtLeast(0)
+            while (waiters.isNotEmpty()) {
+                toWake.add(waiters.removeFirst())
+            }
         }
+        toWake.forEach { it.complete(Unit) }
+    }
+
+    /**
+     * Suspends in a FIFO queue until a concurrency slot is available for [accountId]
+     * or [maxWaitMillis] elapses, so multi-file uploads queue cleanly rather than
+     * failing immediately when per-account or global concurrency is saturated.
+     */
+    suspend fun acquireQueued(
+        accountId: LocalAccountId,
+        maxWaitMillis: Long = DEFAULT_QUEUE_TIMEOUT_MILLIS,
+    ): Admission {
+        var lastAdmission: Admission = tryAcquire(accountId)
+        if (lastAdmission is Admission.Granted ||
+            lastAdmission == Admission.Refused(Refusal.RATE_BUDGET_EXHAUSTED)
+        ) {
+            return lastAdmission
+        }
+        withTimeoutOrNull(maxWaitMillis) {
+            while (lastAdmission !is Admission.Granted) {
+                val waiter = CompletableDeferred<Unit>()
+                synchronized(lock) {
+                    waiters.addLast(waiter)
+                }
+                lastAdmission = tryAcquire(accountId)
+                if (lastAdmission is Admission.Granted ||
+                    lastAdmission == Admission.Refused(Refusal.RATE_BUDGET_EXHAUSTED)
+                ) {
+                    synchronized(lock) {
+                        waiters.remove(waiter)
+                    }
+                    break
+                }
+                waiter.await()
+                lastAdmission = tryAcquire(accountId)
+                if (lastAdmission == Admission.Refused(Refusal.RATE_BUDGET_EXHAUSTED)) {
+                    break
+                }
+            }
+        }
+        return lastAdmission
     }
 
     /** Requests currently in flight for one account. */
@@ -261,6 +309,27 @@ class QuotaGovernor(
         } finally {
             release(accountId)
         }
+    }
+
+    /**
+     * Runs [block] after waiting in the FIFO queue for a concurrency slot,
+     * releasing the slot in `finally`.
+     */
+    suspend fun <T> withQueuedPermit(
+        accountId: LocalAccountId,
+        maxWaitMillis: Long = DEFAULT_QUEUE_TIMEOUT_MILLIS,
+        block: suspend () -> T,
+    ): T? {
+        if (acquireQueued(accountId, maxWaitMillis) !is Admission.Granted) return null
+        return try {
+            block()
+        } finally {
+            release(accountId)
+        }
+    }
+
+    companion object {
+        const val DEFAULT_QUEUE_TIMEOUT_MILLIS = 30_000L
     }
 }
 

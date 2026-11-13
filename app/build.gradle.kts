@@ -21,6 +21,27 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
+        buildConfigField(
+            "String",
+            "GOOGLE_OAUTH_CLIENT_ID",
+            "\"${providers.gradleProperty("GOOGLE_OAUTH_CLIENT_ID").orElse("").get()}\"",
+        )
+        buildConfigField(
+            "String",
+            "ONEDRIVE_CLIENT_ID",
+            "\"${providers.gradleProperty("ONEDRIVE_CLIENT_ID").orElse("").get()}\"",
+        )
+        buildConfigField(
+            "String",
+            "DROPBOX_CLIENT_ID",
+            "\"${providers.gradleProperty("DROPBOX_CLIENT_ID").orElse("").get()}\"",
+        )
+        buildConfigField(
+            "String",
+            "BOX_CLIENT_ID",
+            "\"${providers.gradleProperty("BOX_CLIENT_ID").orElse("").get()}\"",
+        )
+
         // SEC-14: debug logging is compiled out of release builds. The token
         // store is excluded from backup (Rules.md ST-5); a missing allowBackup
         // rule here would be a security defect, not a configuration gap.
@@ -28,7 +49,6 @@ android {
 
     buildTypes {
         debug {
-            applicationIdSuffix = ".debug"
             isMinifyEnabled = false
         }
         release {
@@ -49,6 +69,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 
     packaging {
@@ -192,6 +213,8 @@ dependencies {
     implementation(libs.androidx.paging.runtime)
     implementation(libs.androidx.paging.compose)
     implementation(libs.androidx.datastore.preferences)
+    implementation(libs.serialization.json)
+    implementation(libs.okhttp)
 
     // No Hilt/Koin. The AppContainer is hand-written (Architecture.md §4.2).
     // No Firebase/Crashlytics until Phase 17 (Rules.md TM-1).

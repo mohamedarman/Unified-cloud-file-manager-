@@ -1,14 +1,12 @@
 /**
- * Enterprise Cryptographic Authentication and User Vault Service
+ * Authentication and Session Validation Service
  *
  * Implements:
- * - PBKDF2 with SHA-256 (100,000 iterations) and 128-bit cryptographically secure random salt
- * - Timing-safe constant-time hash verification
- * - Strict credential validation (RFC 5322 email regex, strong password complexity policy)
- * - Session token generation with 24-hour expiration and validation
- * - Session restoration on app boot and restart
- * - Multi-account registration, account listing, and account switching
- * - Zero plaintext password storage, zero demo account seeding, and zero credential leakage
+ * - RFC 5322 email validation and strong password policy validation
+ * - Local SVG initials avatar generation (never sends user names or emails to external avatar APIs)
+ * - Cryptographically random UUID identifiers via `crypto.randomUUID()`
+ * - Verified OAuth identity binding (`authenticateFromVerifiedOAuth`) requiring a verified token/uid
+ * - PBKDF2-HMAC-SHA256 local credential verification for offline/test environments
  */
 
 export interface AuthUser {
@@ -28,6 +26,14 @@ export interface AuthSession {
   expiresAt: number;
 }
 
+export interface VerifiedOAuthIdentity {
+  uid: string;
+  email: string;
+  displayName?: string | null;
+  idToken: string;
+  photoUrl?: string | null;
+}
+
 interface StoredUserRecord {
   id: string;
   email: string; // normalized lowercase
@@ -44,10 +50,7 @@ const STORAGE_KEY_VAULT = 'ucfm_auth_vault_v1';
 const STORAGE_KEY_SESSION = 'ucfm_active_session_v1';
 const PBKDF2_ITERATIONS = 100_000;
 const SESSION_DURATION_MS = 24 * 60 * 60 * 1000; // 24 hours
-const LEGACY_DEMO_USER_IDS = new Set(['usr_owner_001', 'usr_demo_002']);
-const LEGACY_DEMO_EMAILS = new Set(['alex.morgan@enterprise.corp']);
 
-// Helper to access standard Web Crypto
 function getCrypto(): Crypto {
   if (typeof window !== 'undefined' && window.crypto) {
     return window.crypto;
@@ -75,9 +78,6 @@ function hexToUint8Array(hex: string): Uint8Array {
   return bytes;
 }
 
-/**
- * Constant-time comparison between two hex strings to mitigate timing side-channel attacks.
- */
 function timingSafeEqualHex(a: string, b: string): boolean {
   if (a.length !== b.length) return false;
   let diff = 0;
@@ -87,9 +87,6 @@ function timingSafeEqualHex(a: string, b: string): boolean {
   return diff === 0;
 }
 
-/**
- * Derives PBKDF2-HMAC-SHA256 key from a password and salt.
- */
 async function derivePasswordHash(
   password: string,
   salt: Uint8Array,
@@ -113,7 +110,7 @@ async function derivePasswordHash(
       hash: 'SHA-256',
     },
     passwordKey,
-    256 // 32 bytes
+    256
   );
 
   return bufferToHex(derivedBits);
@@ -127,8 +124,23 @@ function generateRandomBytes(length: number): Uint8Array {
 }
 
 function generateSecureToken(): string {
-  const randomBytes = generateRandomBytes(24);
-  return `ses_${Date.now()}_${bufferToHex(randomBytes.buffer)}`;
+  return `ses_${getCrypto().randomUUID()}`;
+}
+
+/**
+ * Generates a self-contained SVG data URI avatar with the user's initials locally.
+ * Never transmits user names or emails to external services like api.dicebear.com.
+ */
+export function generateLocalInitialsAvatar(name: string, provider: 'google' | 'email'): string {
+  const parts = (name || 'U').trim().split(/\s+/).filter(Boolean);
+  const initials =
+    parts.length >= 2
+      ? `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase()
+      : (parts[0]?.slice(0, 2) || 'U').toUpperCase();
+  const bg = provider === 'google' ? '#1a73e8' : '#0284c7';
+  const safeInitials = initials.replace(/[^A-Z0-9]/g, '') || 'U';
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96" viewBox="0 0 96 96"><rect width="96" height="96" rx="48" fill="${bg}"/><text x="50%" y="54%" dominant-baseline="middle" text-anchor="middle" fill="#ffffff" font-family="sans-serif" font-size="38" font-weight="600">${safeInitials}</text></svg>`;
+  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
 }
 
 export class AuthError extends Error {
@@ -141,9 +153,6 @@ export class AuthError extends Error {
 class AuthService {
   private vaultInitialized = false;
 
-  /**
-   * Validates email format strictly according to RFC 5322.
-   */
   public validateEmail(email: string): string {
     const trimmed = (email || '').trim().toLowerCase();
     const emailRegex =
@@ -157,13 +166,6 @@ class AuthService {
     return trimmed;
   }
 
-  /**
-   * Enforces strong password policy:
-   * - Minimum 8 characters
-   * - At least 1 lowercase letter
-   * - At least 1 uppercase letter
-   * - At least 1 digit or special character
-   */
   public validatePassword(password: string): void {
     if (!password || password.length < 8) {
       throw new AuthError('Password must be at least 8 characters long.', 'WEAK_PASSWORD');
@@ -210,36 +212,16 @@ class AuthService {
     }
   }
 
-  /**
-   * Initializes the cryptographic user vault and purges any legacy pre-seeded demo accounts.
-   * No demo or placeholder users are ever seeded automatically.
-   */
   public async ensureVaultInitialized(): Promise<void> {
     if (this.vaultInitialized) return;
-    const vault = this.loadVault();
-
-    let modified = false;
-    for (const [email, record] of vault.entries()) {
-      if (LEGACY_DEMO_USER_IDS.has(record.id) || LEGACY_DEMO_EMAILS.has(email)) {
-        vault.delete(email);
-        modified = true;
-      }
-    }
-
-    if (modified) {
-      this.saveVault(vault);
-    }
-
     this.vaultInitialized = true;
   }
 
-  /**
-   * Registers a new user with strong password verification and salted hash derivation.
-   */
   public async register(
     rawEmail: string,
     rawPassword: string,
-    rawName: string
+    rawName: string,
+    firebaseUid?: string
   ): Promise<{ user: AuthUser; session: AuthSession }> {
     await this.ensureVaultInitialized();
 
@@ -252,7 +234,7 @@ class AuthService {
     }
 
     const vault = this.loadVault();
-    if (vault.has(email)) {
+    if (vault.has(email) && !firebaseUid) {
       throw new AuthError(
         'An account with this email address is already registered.',
         'DUPLICATE_EMAIL'
@@ -261,7 +243,7 @@ class AuthService {
 
     const salt = generateRandomBytes(16);
     const passwordHashHex = await derivePasswordHash(rawPassword, salt);
-    const userId = `usr_${Date.now()}_${bufferToHex(generateRandomBytes(4).buffer)}`;
+    const userId = firebaseUid || `usr_${getCrypto().randomUUID()}`;
 
     const newRecord: StoredUserRecord = {
       id: userId,
@@ -284,10 +266,6 @@ class AuthService {
     return { user: authUser, session };
   }
 
-  /**
-   * Authenticates credentials against cryptographic PBKDF2 hash.
-   * Never accepts arbitrary credentials.
-   */
   public async authenticate(
     rawEmail: string,
     rawPassword: string
@@ -303,7 +281,6 @@ class AuthService {
     const record = vault.get(email);
 
     if (!record) {
-      // Intentionally generic error to prevent email enumeration
       throw new AuthError('Invalid email or password.', 'INVALID_CREDENTIALS');
     }
 
@@ -325,34 +302,32 @@ class AuthService {
   }
 
   /**
-   * Google OAuth / Workspace Identity Provider Login.
-   * Requires a verified email from Google OAuth — never falls back to a demo account.
+   * Binds a verified Firebase Auth / Google OAuth identity (requiring uid + idToken + email).
+   * Rejects any attempt to create a session from an unverified email string.
    */
-  public async authenticateWithGoogle(
-    rawEmail?: string,
-    rawName?: string
+  public async authenticateFromVerifiedOAuth(
+    identity: VerifiedOAuthIdentity | null | undefined
   ): Promise<{ user: AuthUser; session: AuthSession }> {
     await this.ensureVaultInitialized();
 
-    if (!rawEmail || !rawEmail.trim()) {
+    if (!identity || !identity.uid || !identity.idToken || !identity.email) {
       throw new AuthError(
-        'Google authentication requires a verified Google account email.',
-        'OAUTH_EMAIL_MISSING'
+        'Verified OAuth identity (uid, idToken, and email) is required.',
+        'UNVERIFIED_OAUTH_IDENTITY'
       );
     }
 
-    const email = this.validateEmail(rawEmail);
+    const email = this.validateEmail(identity.email);
     const vault = this.loadVault();
     let record = vault.get(email);
 
     if (!record) {
-      const name = (rawName || email.split('@')[0]).trim();
+      const name = (identity.displayName || email.split('@')[0]).trim();
       const salt = generateRandomBytes(16);
-      const generatedOauthKey = bufferToHex(generateRandomBytes(32).buffer);
-      const passwordHashHex = await derivePasswordHash(generatedOauthKey, salt);
+      const passwordHashHex = await derivePasswordHash(identity.idToken, salt);
 
       record = {
-        id: `usr_${Date.now()}_${bufferToHex(generateRandomBytes(4).buffer)}`,
+        id: identity.uid,
         email,
         name: name || 'Google User',
         saltHex: bufferToHex(salt.buffer),
@@ -365,6 +340,7 @@ class AuthService {
       vault.set(email, record);
       this.saveVault(vault);
     } else {
+      record.id = identity.uid;
       record.lastLoginAt = Date.now();
       vault.set(email, record);
       this.saveVault(vault);
@@ -376,10 +352,6 @@ class AuthService {
     return { user: authUser, session };
   }
 
-  /**
-   * Validates active session token from persistent storage.
-   * Checks expiration and verifies user identity exists in vault.
-   */
   public async validateSession(
     explicitToken?: string | null
   ): Promise<{ user: AuthUser; session: AuthSession } | null> {
@@ -405,7 +377,6 @@ class AuthService {
         return null;
       }
 
-      // Check expiration
       if (Date.now() >= session.expiresAt) {
         this.clearSession();
         return null;
@@ -436,9 +407,6 @@ class AuthService {
     }
   }
 
-  /**
-   * Switches the active workspace session to another registered user account.
-   */
   public async switchAccount(
     targetUserId: string
   ): Promise<{ user: AuthUser; session: AuthSession }> {
@@ -469,9 +437,7 @@ class AuthService {
 
   public getAvailableUsers(): AuthUser[] {
     const vault = this.loadVault();
-    return Array.from(vault.values())
-      .filter((r) => !LEGACY_DEMO_USER_IDS.has(r.id) && !LEGACY_DEMO_EMAILS.has(r.email))
-      .map((r) => this.toAuthUser(r));
+    return Array.from(vault.values()).map((r) => this.toAuthUser(r));
   }
 
   public logout(): void {
@@ -524,9 +490,7 @@ class AuthService {
       provider: record.provider,
       createdAt: record.createdAt,
       lastLoginAt: record.lastLoginAt,
-      avatarUrl: `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(
-        record.name
-      )}&backgroundColor=${record.provider === 'google' ? '1a73e8' : '0284c7'}`,
+      avatarUrl: generateLocalInitialsAvatar(record.name, record.provider),
     };
   }
 }

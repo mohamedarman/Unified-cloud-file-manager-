@@ -308,21 +308,23 @@ export const SyncStatusIndicator: React.FC = () => {
               <span>Cadence: every 5 min</span>
             </span>
 
-            <button
-              onClick={() => {
-                const target = accounts[0]?.localId;
-                if (target) {
-                  const current = syncStatuses[target]?.status;
-                  simulateProviderIssue(
-                    target,
-                    current === 'error' ? 'none' : 'error'
-                  );
-                }
-              }}
-              className="text-[11px] text-blue-600 dark:text-blue-400 hover:underline transition font-medium"
-            >
-              Test Diagnostics
-            </button>
+            {import.meta.env.DEV && (
+              <button
+                onClick={() => {
+                  const target = accounts[0]?.localId;
+                  if (target) {
+                    const current = syncStatuses[target]?.status;
+                    simulateProviderIssue(
+                      target,
+                      current === 'error' ? 'none' : 'error'
+                    );
+                  }
+                }}
+                className="text-[11px] text-blue-600 dark:text-blue-400 hover:underline transition font-medium"
+              >
+                Test Diagnostics (Dev)
+              </button>
+            )}
           </div>
         </div>
       )}

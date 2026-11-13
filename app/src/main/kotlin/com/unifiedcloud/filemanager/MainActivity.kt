@@ -1,11 +1,21 @@
 package com.unifiedcloud.filemanager
 
+import android.Manifest
 import android.annotation.SuppressLint
+import android.app.DownloadManager
 import android.content.Context
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.net.Uri
+import android.os.Build
 import android.os.Bundle
+import android.os.Environment
 import android.util.Log
 import android.view.ViewGroup
 import android.webkit.ConsoleMessage
+import android.webkit.RenderProcessGoneDetail
+import android.webkit.URLUtil
+import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
@@ -16,14 +26,20 @@ import android.webkit.WebViewClient
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.ActivityResult
+import androidx.activity.result.ActivityResultLauncher
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -32,6 +48,8 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -42,27 +60,120 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.content.ContextCompat
 import androidx.webkit.WebViewAssetLoader
 
 class MainActivity : ComponentActivity() {
+    private var fileUploadCallback: ValueCallback<Array<Uri>>? = null
+    private lateinit var fileChooserLauncher: ActivityResultLauncher<Intent>
+    private lateinit var notificationPermissionLauncher: ActivityResultLauncher<String>
+    private lateinit var nativeBridge: NativeCloudBridge
+
     override fun onCreate(savedInstanceState: Bundle?) {
+        enableEdgeToEdge()
         super.onCreate(savedInstanceState)
+
+        WebView.setWebContentsDebuggingEnabled(BuildConfig.DEBUG)
+        nativeBridge = NativeCloudBridge(applicationContext)
+        captureOAuthIntent(intent)
+
+        fileChooserLauncher =
+            registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+                handleFileChooserResult(result)
+            }
+
+        notificationPermissionLauncher =
+            registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+                Log.d(TAG, "POST_NOTIFICATIONS permission granted=$granted")
+            }
+
+        requestNotificationsPermissionIfNeeded()
 
         setContent {
             MaterialTheme {
                 Surface(
-                    modifier = Modifier.fillMaxSize(),
+                    modifier =
+                        Modifier
+                            .fillMaxSize()
+                            .systemBarsPadding()
+                            .imePadding(),
                     color = MaterialTheme.colorScheme.background,
                 ) {
-                    AppWebView()
+                    AppWebView(
+                        nativeBridge = nativeBridge,
+                        onLaunchFileChooser = ::launchSystemFileChooser,
+                    )
                 }
             }
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        captureOAuthIntent(intent)
+    }
+
+    private fun captureOAuthIntent(incoming: Intent?) {
+        val data = incoming?.data ?: return
+        if (data.scheme == OAUTH_REDIRECT_SCHEME && data.host == OAUTH_REDIRECT_HOST) {
+            nativeBridge.recordOAuthRedirect(data)
+        }
+    }
+
+    private fun requestNotificationsPermissionIfNeeded() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            val status =
+                ContextCompat.checkSelfPermission(
+                    this,
+                    Manifest.permission.POST_NOTIFICATIONS,
+                )
+            if (status != PackageManager.PERMISSION_GRANTED) {
+                notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+            }
+        }
+    }
+
+    private fun launchSystemFileChooser(
+        callback: ValueCallback<Array<Uri>>,
+        params: WebChromeClient.FileChooserParams?,
+    ): Boolean {
+        fileUploadCallback?.onReceiveValue(null)
+        fileUploadCallback = callback
+        val chooserIntent =
+            runCatching { params?.createIntent() }.getOrNull()
+                ?: Intent(Intent.ACTION_GET_CONTENT).apply {
+                    addCategory(Intent.CATEGORY_OPENABLE)
+                    type = "*/*"
+                }
+        return runCatching {
+            fileChooserLauncher.launch(chooserIntent)
+            true
+        }.getOrElse {
+            fileUploadCallback?.onReceiveValue(null)
+            fileUploadCallback = null
+            false
+        }
+    }
+
+    private fun handleFileChooserResult(result: ActivityResult) {
+        val callback = fileUploadCallback ?: return
+        fileUploadCallback = null
+        val clipData = result.data?.clipData
+        val uris =
+            if (result.resultCode == RESULT_OK && clipData != null && clipData.itemCount > 0) {
+                Array(clipData.itemCount) { index -> clipData.getItemAt(index).uri }
+            } else {
+                WebChromeClient.FileChooserParams.parseResult(result.resultCode, result.data)
+            }
+        callback.onReceiveValue(uris)
     }
 }
 
 private const val ASSET_DOMAIN = "appassets.androidplatform.net"
 private const val APP_URL = "https://$ASSET_DOMAIN/assets/index.html"
+private const val OAUTH_REDIRECT_SCHEME = "com.unifiedcloud.filemanager"
+private const val OAUTH_REDIRECT_HOST = "oauth2redirect"
 private const val TAG = "UnifiedCloudWebView"
 
 // Constants for styling and configuration
@@ -83,14 +194,28 @@ private const val SPACING_LARGE = 20
 private const val PADDING_DEFAULT = 24
 private const val UNKNOWN_HTTP_STATUS = -1
 
+private data class WebViewCallbacks(
+    val onFinished: () -> Unit,
+    val onError: (String) -> Unit,
+    val onRendererCrashed: () -> Unit,
+    val onLaunchFileChooser: (
+        ValueCallback<Array<Uri>>,
+        WebChromeClient.FileChooserParams?,
+    ) -> Boolean,
+)
+
 @SuppressLint("SetJavaScriptEnabled")
 @Suppress("FunctionName", "ktlint:standard:function-naming")
 @Composable
-fun AppWebView() {
+fun AppWebView(
+    nativeBridge: NativeCloudBridge,
+    onLaunchFileChooser: (ValueCallback<Array<Uri>>, WebChromeClient.FileChooserParams?) -> Boolean,
+) {
     var isLoading by remember { mutableStateOf(true) }
     var loadError by remember { mutableStateOf<String?>(null) }
     var webViewInstance by remember { mutableStateOf<WebView?>(null) }
     var canNavigateBack by remember { mutableStateOf(false) }
+    var recreateGeneration by remember { mutableIntStateOf(0) }
 
     BackHandler(enabled = canNavigateBack) {
         webViewInstance?.goBack()
@@ -102,25 +227,39 @@ fun AppWebView() {
                 .fillMaxSize()
                 .background(Color(BACKGROUND_COLOR_HEX)),
     ) {
-        AndroidView(
-            modifier = Modifier.fillMaxSize(),
-            factory = { context ->
-                createWebView(
-                    context = context,
-                    onFinished = {
-                        isLoading = false
-                        canNavigateBack = webViewInstance?.canGoBack() == true
-                    },
-                    onError = { error ->
-                        loadError = error
-                        isLoading = false
-                    },
-                ).also { webView ->
-                    webViewInstance = webView
-                    webView.loadUrl(APP_URL)
-                }
-            },
-        )
+        key(recreateGeneration) {
+            AndroidView(
+                modifier = Modifier.fillMaxSize(),
+                factory = { context ->
+                    val callbacks =
+                        WebViewCallbacks(
+                            onFinished = {
+                                isLoading = false
+                                canNavigateBack = webViewInstance?.canGoBack() == true
+                            },
+                            onError = { error ->
+                                loadError = error
+                                isLoading = false
+                            },
+                            onRendererCrashed = {
+                                Log.w(TAG, "WebView renderer process gone; recreating WebView")
+                                isLoading = true
+                                loadError = null
+                                recreateGeneration++
+                            },
+                            onLaunchFileChooser = onLaunchFileChooser,
+                        )
+                    createWebView(
+                        context = context,
+                        nativeBridge = nativeBridge,
+                        callbacks = callbacks,
+                    ).also { webView ->
+                        webViewInstance = webView
+                        webView.loadUrl(APP_URL)
+                    }
+                },
+            )
+        }
 
         if (isLoading && loadError == null) {
             LoadingOverlay()
@@ -139,8 +278,8 @@ fun AppWebView() {
 @SuppressLint("SetJavaScriptEnabled")
 private fun createWebView(
     context: Context,
-    onFinished: () -> Unit,
-    onError: (String) -> Unit,
+    nativeBridge: NativeCloudBridge,
+    callbacks: WebViewCallbacks,
 ): WebView {
     val assetLoader =
         WebViewAssetLoader
@@ -167,35 +306,92 @@ private fun createWebView(
             setSupportZoom(false)
             cacheMode = WebSettings.LOAD_DEFAULT
         }
-        webChromeClient = createWebChromeClient()
-        webViewClient = createWebViewClient(assetLoader, onFinished, onError)
+        addJavascriptInterface(nativeBridge, NativeCloudBridge.JS_INTERFACE_NAME)
+        setDownloadListener { url, userAgent, contentDisposition, mimeType, _ ->
+            handleWebViewDownload(context, url, userAgent, contentDisposition, mimeType)
+        }
+        webChromeClient = createWebChromeClient(callbacks.onLaunchFileChooser)
+        webViewClient = createWebViewClient(context, assetLoader, callbacks)
     }
 }
 
-private fun createWebChromeClient() =
-    object : WebChromeClient() {
-        override fun onConsoleMessage(consoleMessage: ConsoleMessage?): Boolean {
-            consoleMessage?.let {
-                val logMsg = "[${it.sourceId()}:${it.lineNumber()}] ${it.message()}"
-                when (it.messageLevel()) {
-                    ConsoleMessage.MessageLevel.ERROR -> Log.e(TAG, logMsg)
-                    ConsoleMessage.MessageLevel.WARNING -> Log.w(TAG, logMsg)
-                    else -> Log.d(TAG, logMsg)
+private fun handleWebViewDownload(
+    context: Context,
+    url: String?,
+    userAgent: String?,
+    contentDisposition: String?,
+    mimeType: String?,
+) {
+    val parsed = url?.let { runCatching { Uri.parse(it) }.getOrNull() } ?: return
+    if (parsed.scheme != "https") return
+    runCatching {
+        val fileName = URLUtil.guessFileName(url, contentDisposition, mimeType)
+        val request =
+            DownloadManager.Request(parsed).apply {
+                setMimeType(mimeType)
+                if (!userAgent.isNullOrBlank()) {
+                    addRequestHeader("User-Agent", userAgent)
                 }
+                setTitle(fileName)
+                setNotificationVisibility(
+                    DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED,
+                )
+                setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, fileName)
             }
-            return true
-        }
+        val dm = context.getSystemService(Context.DOWNLOAD_SERVICE) as? DownloadManager
+        dm?.enqueue(request)
+    }.onFailure { err ->
+        Log.w(TAG, "DownloadManager enqueue failed: ${err.message}")
+    }
+}
+
+private fun createWebChromeClient(
+    onLaunchFileChooser: (ValueCallback<Array<Uri>>, WebChromeClient.FileChooserParams?) -> Boolean,
+) = object : WebChromeClient() {
+    override fun onShowFileChooser(
+        webView: WebView?,
+        filePathCallback: ValueCallback<Array<Uri>>?,
+        fileChooserParams: FileChooserParams?,
+    ): Boolean {
+        val callback = filePathCallback ?: return false
+        return onLaunchFileChooser(callback, fileChooserParams)
     }
 
+    override fun onConsoleMessage(consoleMessage: ConsoleMessage?): Boolean {
+        consoleMessage?.let {
+            val logMsg = "[${it.sourceId()}:${it.lineNumber()}] ${it.message()}"
+            when (it.messageLevel()) {
+                ConsoleMessage.MessageLevel.ERROR -> Log.e(TAG, logMsg)
+                ConsoleMessage.MessageLevel.WARNING -> Log.w(TAG, logMsg)
+                else -> Log.d(TAG, logMsg)
+            }
+        }
+        return true
+    }
+}
+
 private fun createWebViewClient(
+    context: Context,
     assetLoader: WebViewAssetLoader,
-    onFinished: () -> Unit,
-    onError: (String) -> Unit,
+    callbacks: WebViewCallbacks,
 ) = object : WebViewClient() {
     override fun shouldOverrideUrlLoading(
         view: WebView?,
         request: WebResourceRequest?,
-    ): Boolean = request?.url?.host != ASSET_DOMAIN
+    ): Boolean {
+        val url = request?.url ?: return true
+        val isLocalAsset = url.scheme == "https" && url.host == ASSET_DOMAIN
+        if (!isLocalAsset && (url.scheme == "https" || url.scheme == "http")) {
+            runCatching {
+                val intent =
+                    Intent(Intent.ACTION_VIEW, url).apply {
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+                context.startActivity(intent)
+            }
+        }
+        return !isLocalAsset
+    }
 
     override fun shouldInterceptRequest(
         view: WebView?,
@@ -207,7 +403,7 @@ private fun createWebViewClient(
         url: String?,
     ) {
         super.onPageFinished(view, url)
-        onFinished()
+        callbacks.onFinished()
     }
 
     override fun onReceivedError(
@@ -217,7 +413,7 @@ private fun createWebViewClient(
     ) {
         super.onReceivedError(view, request, error)
         if (request?.isForMainFrame == true) {
-            onError(error?.description?.toString() ?: "Connection failed")
+            callbacks.onError(error?.description?.toString() ?: "Connection failed")
         }
     }
 
@@ -228,8 +424,17 @@ private fun createWebViewClient(
     ) {
         super.onReceivedHttpError(view, request, response)
         if (request?.isForMainFrame == true) {
-            onError("HTTP error ${response?.statusCode ?: UNKNOWN_HTTP_STATUS}")
+            callbacks.onError("HTTP error ${response?.statusCode ?: UNKNOWN_HTTP_STATUS}")
         }
+    }
+
+    override fun onRenderProcessGone(
+        view: WebView?,
+        detail: RenderProcessGoneDetail?,
+    ): Boolean {
+        view?.destroy()
+        callbacks.onRendererCrashed()
+        return true
     }
 }
 

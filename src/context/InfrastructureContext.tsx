@@ -128,7 +128,7 @@ export const InfrastructureProvider: React.FC<{ children: ReactNode }> = ({ chil
 
         // Add log entry
         const newLog: InfrastructureLog = {
-          id: `log-${Date.now()}`,
+          id: `log_${crypto.randomUUID()}`,
           timestamp: new Date().toLocaleTimeString() + ' UTC',
           timestampEpoch: Date.now(),
           level: willStop ? 'WARN' : 'INFO',
@@ -165,7 +165,7 @@ export const InfrastructureProvider: React.FC<{ children: ReactNode }> = ({ chil
     toast.info(`Reboot sequence initiated for ${res.name}`);
 
     const newLog: InfrastructureLog = {
-      id: `log-${Date.now()}`,
+      id: `log_${crypto.randomUUID()}`,
       timestamp: new Date().toLocaleTimeString() + ' UTC',
       timestampEpoch: Date.now(),
       level: 'INFO',
@@ -234,7 +234,7 @@ export const InfrastructureProvider: React.FC<{ children: ReactNode }> = ({ chil
       );
 
       const newLog: InfrastructureLog = {
-        id: `log-${Date.now()}`,
+        id: `log_${crypto.randomUUID()}`,
         timestamp: new Date().toLocaleTimeString() + ' UTC',
         timestampEpoch: Date.now(),
         level: 'INFO',
@@ -255,7 +255,7 @@ export const InfrastructureProvider: React.FC<{ children: ReactNode }> = ({ chil
     accountIdOrSub: string
   ) => {
     const newAccount: CloudProviderAccount = {
-      id: `cpa-${Date.now()}`,
+      id: `cpa_${crypto.randomUUID()}`,
       provider,
       displayName: name,
       accountIdOrSub,

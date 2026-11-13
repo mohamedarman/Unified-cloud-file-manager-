@@ -94,6 +94,33 @@ data class ProviderCapabilities(
                 grantsOfflineAccess = true,
                 canExport = true,
             )
+
+        /**
+         * Computes real capabilities for a provider and scope grant.
+         *
+         * - Only Google Drive supports exporting workspace native documents (`canExport`).
+         * - Dropbox API v2 metadata does not expose a native starred flag (`canStar = false`).
+         * - Write operations (`canWriteFiles`, `canCreateFolders`, `canRename`, `canTrash`)
+         *   depend on whether a write scope was granted.
+         */
+        fun forProvider(
+            provider: ProviderId,
+            hasWriteScope: Boolean,
+            hasOfflineRefresh: Boolean = true,
+        ): ProviderCapabilities =
+            ProviderCapabilities(
+                canReadFiles = true,
+                canWriteFiles = hasWriteScope,
+                canCreateFolders = hasWriteScope,
+                canRename = hasWriteScope,
+                canTrash = hasWriteScope,
+                canSearch = true,
+                canReadRevisions = true,
+                canStar = provider != ProviderId.DROPBOX && hasWriteScope,
+                canDownloadBytes = true,
+                grantsOfflineAccess = hasOfflineRefresh,
+                canExport = provider == ProviderId.GOOGLE_DRIVE,
+            )
     }
 }
 

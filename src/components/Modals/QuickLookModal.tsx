@@ -40,11 +40,12 @@ export const QuickLookModal: React.FC<QuickLookModalProps> = ({
   const provider = PROVIDERS[file.ref.provider];
 
   const handleCopyLink = () => {
-    const link =
-      file.webViewLink ||
-      `https://cloud.filemanager.app/files/${file.ref.provider.toLowerCase()}/${file.ref.accountId}/${file.ref.fileId}`;
-    navigator.clipboard.writeText(link);
-    toast.success('Share link copied to clipboard');
+    if (!file.webViewLink) {
+      toast.error('Share link not available from provider for this file');
+      return;
+    }
+    navigator.clipboard.writeText(file.webViewLink);
+    toast.success('Provider web link copied to clipboard');
   };
 
   return (

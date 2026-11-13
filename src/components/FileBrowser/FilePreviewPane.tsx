@@ -126,7 +126,7 @@ All data is stored directly in the originating cloud provider and streamed on-de
 
 Section 2: Security & Permissions
 - Encryption: TLS 1.3 in transit, AES-256 at rest
-- Zero-Storage Guarantee: Client-side ephemeral streaming
+- Direct Provider Streaming: Local metadata & opt-in pinned cache
 - Isolated tokens: Managed under strict OAuth credentials.`;
   }, [file]);
 

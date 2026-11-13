@@ -83,23 +83,25 @@ export const FileDetailsModal: React.FC<FileDetailsModalProps> = ({
   const correlationTag = Redactor.fileRefTag(file.ref.accountId, file.ref.fileId);
 
   const handleCopyLink = () => {
-    const link =
-      file.webViewLink ||
-      `https://cloud.filemanager.app/files/${file.ref.provider.toLowerCase()}/${file.ref.accountId}/${file.ref.fileId}`;
-    navigator.clipboard.writeText(link);
+    if (!file.webViewLink) {
+      return;
+    }
+    navigator.clipboard.writeText(file.webViewLink);
     setCopiedLink(true);
     setTimeout(() => setCopiedLink(false), 2000);
-    addAuditLog(file.ref.accountId, 'SHARE_LINK_COPIED', `Copied link for ${file.name}`, file.ref.fileId);
+    addAuditLog(file.ref.accountId, 'SHARE_LINK_COPIED', `Copied provider webViewLink for ${file.name}`, file.ref.fileId);
   };
 
   const handleExport = (format: string) => {
+    if (!accountCapabilities.canExport) {
+      return;
+    }
     addAuditLog(
       file.ref.accountId,
       'DOCUMENT_EXPORT',
       `Exported document "${file.name}" to ${format}`,
       file.ref.fileId
     );
-    // Trigger simulated export download
     downloadFile({
       ...file,
       name: `${file.name.replace(/\.[^/.]+$/, '')}.${format.toLowerCase()}`,
@@ -342,8 +344,19 @@ export const FileDetailsModal: React.FC<FileDetailsModalProps> = ({
 
               {/* SHARE */}
               <ActionButton
-                action={resolvedActions.get(FileAction.SHARE)!}
-                label={copiedLink ? 'Link Copied!' : 'Copy Shareable Link'}
+                action={
+                  file.webViewLink
+                    ? resolvedActions.get(FileAction.SHARE)!
+                    : {
+                        action: FileAction.SHARE,
+                        available: false,
+                        reason: {
+                          type: 'FileCannot',
+                          explanation: 'Not available (provider did not return a webViewLink)',
+                        },
+                      }
+                }
+                label={copiedLink ? 'Link Copied!' : 'Copy Provider Web Link'}
                 icon={copiedLink ? <CheckCircle2 className="w-4 h-4 text-emerald-600" /> : <Share2 className="w-4 h-4 text-slate-700" />}
                 onClick={handleCopyLink}
               />

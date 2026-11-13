@@ -342,4 +342,26 @@ class QuotaGovernorTest {
             peak.get() <= perAccountCap,
         )
     }
+
+    @Test
+    fun `withQueuedPermit waits for an in-flight slot to be released instead of failing`() {
+        runTest {
+            val governor = governor(perAccount = 1, global = 2)
+            assertEquals(Admission.Granted, governor.tryAcquire(alice))
+
+            val gate = CountDownLatch(1)
+            val releaser =
+                thread {
+                    gate.await()
+                    Thread.sleep(25)
+                    governor.release(alice)
+                }
+            gate.countDown()
+            val result = governor.withQueuedPermit(alice, maxWaitMillis = 2_000L) { "queued-upload-complete" }
+            releaser.join()
+
+            assertEquals("queued-upload-complete", result)
+            assertEquals(0, governor.inFlightTotal())
+        }
+    }
 }
