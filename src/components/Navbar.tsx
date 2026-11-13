@@ -16,7 +16,6 @@ import {
   Smartphone,
 } from 'lucide-react';
 import { useFileManager } from '../context/FileManagerContext';
-import { useInfrastructure } from '../context/InfrastructureContext';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 

@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   createEntityId,
+  createMonotonicIdAllocator,
   computeTransferProgress,
   wouldMoveCreateFolderCycle,
   collectDescendantFileKeys,
@@ -35,11 +36,16 @@ function makeFile(
 }
 
 describe('Phase 1 & Phase 3 File Manager Domain Logic', () => {
-  it('generates collision-free UUID-backed entity IDs instead of Date.now()', () => {
+  it('generates collision-free UUID-backed entity IDs and strictly monotonic operation IDs without Date.now()', () => {
     const id1 = createEntityId('file_upload');
     const id2 = createEntityId('file_upload');
     expect(id1).not.toBe(id2);
     expect(id1).toMatch(/^file_upload_[0-9a-f-]{36}$/i);
+
+    const nextOpId = createMonotonicIdAllocator(50);
+    expect(nextOpId()).toBe(51);
+    expect(nextOpId()).toBe(52);
+    expect(nextOpId()).toBe(53);
   });
 
   it('handles 0-byte upload progress cleanly as 100% without NaN', () => {
@@ -133,18 +139,32 @@ describe('Phase 1 & Phase 3 File Manager Domain Logic', () => {
     expect(isDuplicateProviderAccount(existing, 'DROPBOX', 'user@example.com')).toBe(false);
   });
 
-  it('builds real provider capabilities based on provider abilities and scopes', () => {
-    const gdriveRw = cloudProviderService.getCapabilities('GOOGLE_DRIVE', ['read', 'write']);
+  it('builds accurate provider-specific capabilities based on provider abilities and scopes', () => {
+    const gdriveRw = cloudProviderService.getCapabilities('GOOGLE_DRIVE', ['https://www.googleapis.com/auth/drive.file']);
     expect(gdriveRw.canExport).toBe(true);
+    expect(gdriveRw.canStar).toBe(true);
+    expect(gdriveRw.canTrash).toBe(true);
     expect(gdriveRw.canWriteFiles).toBe(true);
 
-    const gdriveRo = cloudProviderService.getCapabilities('GOOGLE_DRIVE', ['read']);
+    const gdriveRo = cloudProviderService.getCapabilities('GOOGLE_DRIVE', ['https://www.googleapis.com/auth/drive.readonly']);
     expect(gdriveRo.canWriteFiles).toBe(false);
     expect(gdriveRo.canTrash).toBe(false);
+    expect(gdriveRo.canStar).toBe(false);
 
-    const dropboxCaps = cloudProviderService.getCapabilities('DROPBOX', ['read', 'write']);
+    const onedriveCaps = cloudProviderService.getCapabilities('ONE_DRIVE', ['Files.ReadWrite']);
+    expect(onedriveCaps.canTrash).toBe(true);
+    expect(onedriveCaps.canStar).toBe(false);
+    expect(onedriveCaps.canExport).toBe(false);
+
+    const dropboxCaps = cloudProviderService.getCapabilities('DROPBOX', ['files.content.write']);
+    expect(dropboxCaps.canTrash).toBe(false);
     expect(dropboxCaps.canStar).toBe(false);
     expect(dropboxCaps.canExport).toBe(false);
+
+    const boxCaps = cloudProviderService.getCapabilities('BOX', ['root_readwrite']);
+    expect(boxCaps.canTrash).toBe(true);
+    expect(boxCaps.canStar).toBe(false);
+    expect(boxCaps.canExport).toBe(false);
   });
 
   it('queues multi-file requests in QuotaGovernor instead of failing immediately', async () => {

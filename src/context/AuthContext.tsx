@@ -172,14 +172,21 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         });
       } catch (fbErr: unknown) {
         const fbCode = (fbErr as { code?: string })?.code || '';
-        if (
+        if (fbCode === 'auth/network-request-failed') {
+          res = await authService.authenticate(normalizedEmail, password);
+        } else if (
           fbCode === 'auth/invalid-credential' ||
           fbCode === 'auth/wrong-password' ||
-          fbCode === 'auth/user-not-found'
+          fbCode === 'auth/user-not-found' ||
+          fbCode === 'auth/invalid-email'
         ) {
-          res = await authService.authenticate(normalizedEmail, password);
-        } else if (fbCode === 'auth/network-request-failed') {
-          res = await authService.authenticate(normalizedEmail, password);
+          throw new Error('Invalid email or password.');
+        } else if (fbCode === 'auth/user-disabled') {
+          throw new Error('This account has been disabled.');
+        } else if (fbCode === 'auth/too-many-requests') {
+          throw new Error('Too many failed sign-in attempts. Please wait and try again.');
+        } else if (fbCode) {
+          throw fbErr instanceof Error ? fbErr : new Error(String(fbErr));
         } else {
           res = await authService.authenticate(normalizedEmail, password);
         }
@@ -188,11 +195,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setUser(res.user);
       setSession(res.session);
       refreshAvailableUsers();
-      void databaseService.syncUserProfile(res.user);
+      if (firebaseAuth.currentUser?.uid === res.user.id) {
+        void databaseService.syncUserProfile(res.user).catch((err) => {
+          console.warn('Profile sync warning:', err);
+        });
+      }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Email login failed.';
       setSessionError(msg);
-      throw err;
+      throw err instanceof Error ? err : new Error(msg);
     }
   };
 
@@ -223,7 +234,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setUser(res.user);
       setSession(res.session);
       refreshAvailableUsers();
-      void databaseService.syncUserProfile(res.user);
+      if (firebaseAuth.currentUser?.uid === res.user.id) {
+        void databaseService.syncUserProfile(res.user).catch((err) => {
+          console.warn('Profile sync warning:', err);
+        });
+      }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Signup failed.';
       setSessionError(msg);
@@ -239,11 +254,22 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const switchAccount = async (targetUserId: string): Promise<void> => {
     setSessionError(null);
+    if (firebaseAuth.currentUser && firebaseAuth.currentUser.uid !== targetUserId) {
+      try {
+        await signOut(firebaseAuth);
+      } catch (err) {
+        console.warn('Firebase signOut during account switch warning:', err);
+      }
+    }
     const result = await authService.switchAccount(targetUserId);
     setUser(result.user);
     setSession(result.session);
     refreshAvailableUsers();
-    void databaseService.syncUserProfile(result.user);
+    if (firebaseAuth.currentUser?.uid === result.user.id) {
+      void databaseService.syncUserProfile(result.user).catch((err) => {
+        console.warn('Profile sync warning:', err);
+      });
+    }
   };
 
   const logout = async () => {

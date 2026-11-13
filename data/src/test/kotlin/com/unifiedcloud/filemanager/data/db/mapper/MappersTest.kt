@@ -31,9 +31,8 @@ class MappersTest {
                 provider = "GOOGLE_DRIVE",
                 providerAccountId = "sub_123",
                 displayEmail = "alice@example.com",
-                displayName = "Alice",
-                avatarUrl = null,
-                createdAt = 1_000L,
+                isActive = true,
+                connectedAt = 1_000L,
             )
         val mapped = valid.toDomain(ProviderId.GOOGLE_DRIVE)
         assertTrue(mapped.isSuccess)

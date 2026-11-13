@@ -3,68 +3,86 @@ import {
   HelpCircle,
   ChevronDown,
   ChevronUp,
-  MessageSquare,
-  Send,
-  CheckCircle2,
   BookOpen,
-  Smartphone,
   ExternalLink,
+  Copy,
+  Check,
+  Terminal,
 } from 'lucide-react';
+import { useFileManager } from '../../context/FileManagerContext';
+import { toast } from 'sonner';
 
 export const HelpSupportView: React.FC = () => {
+  const { accounts } = useFileManager();
   const [openFaq, setOpenFaq] = useState<number | null>(0);
-  const [feedbackSent, setFeedbackSent] = useState(false);
-  const [message, setMessage] = useState('');
+  const [copiedDiagnostics, setCopiedDiagnostics] = useState(false);
 
   const faqs = [
     {
       q: 'How does Multi-Cloud Unified Management work?',
-      a: 'The application acts as a client-side unified controller. When you connect your Google Drive, OneDrive, Dropbox, or Box accounts, you can browse, upload, download, and search across all of them from a single dashboard without switching apps or logging in and out.',
+      a: 'The application acts as a client-side unified controller. When you connect your Google Drive, OneDrive, Dropbox, or Box accounts via OAuth 2.0 + PKCE, you can browse, upload, download, and search across all of them from a single workspace without mixing tokens or permissions.',
     },
     {
       q: 'Does this app provide or bypass cloud storage limits?',
       a: 'No. Storage remains strictly owned, metered, and enforced by each respective cloud provider. You use your existing storage quotas provided by Google One, Microsoft 365, Dropbox, or Box.',
     },
     {
-      q: 'How do I install this app as a native mobile app (PWA or APK)?',
-      a: 'On Android Chrome: tap the browser menu (⋮) and select "Install app" or "Add to Home screen". On iOS Safari: tap the Share button and select "Add to Home Screen". You can also package this codebase with Bubblewrap into an Android APK for Google Play Store.',
+      q: 'How do I run or package this app on Android?',
+      a: 'On Android Chrome you can install the PWA via "Add to Home screen", or build the included Kotlin/Compose Android project (app/) which hosts the workspace with native Android Keystore token storage, Room offline persistence, WorkManager sync, and Chrome Custom Tabs OAuth.',
     },
     {
       q: 'What happens when I disconnect a cloud account?',
-      a: 'In accordance with our strict multi-account isolation rules (ST-4), disconnecting an account permanently purges all cached authentication tokens, index metadata, and thumbnail references from local browser storage.',
+      a: 'In accordance with multi-account isolation rules, disconnecting an account revokes its OAuth token where supported and purges its cached credentials, file metadata, and offline pinned bytes from local storage.',
     },
     {
-      q: 'Are my OAuth tokens sent to any external server?',
-      a: 'No. All authentication code exchanges and API requests occur directly between your device and the respective cloud provider endpoints (e.g. googleapis.com, graph.microsoft.com).',
+      q: 'Are my OAuth tokens sent to any third-party proxy server?',
+      a: 'No. All OAuth authorization code exchanges and cloud API requests occur directly between your device and the respective provider endpoints (googleapis.com, graph.microsoft.com, dropboxapi.com, box.com).',
     },
   ];
 
-  const handleSendFeedback = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!message.trim()) return;
-    setFeedbackSent(true);
-    setMessage('');
-    setTimeout(() => setFeedbackSent(false), 4000);
+  const handleCopyDiagnostics = async () => {
+    const hasNativeBridge =
+      typeof window !== 'undefined' &&
+      Boolean((window as { UnifiedCloudBridge?: unknown }).UnifiedCloudBridge);
+
+    const report = {
+      app: 'Unified Cloud File Manager',
+      online: typeof navigator !== 'undefined' ? navigator.onLine : true,
+      nativeAndroidBridge: hasNativeBridge,
+      connectedAccountsCount: accounts.length,
+      providers: accounts.map((a) => ({ provider: a.provider, state: a.state })),
+      platform: typeof navigator !== 'undefined' ? navigator.platform : 'unknown',
+      timestampIso: new Date().toISOString(),
+    };
+
+    try {
+      await navigator.clipboard.writeText(JSON.stringify(report, null, 2));
+      setCopiedDiagnostics(true);
+      toast.success('Non-sensitive client diagnostics copied to clipboard.');
+      setTimeout(() => setCopiedDiagnostics(false), 2500);
+    } catch {
+      toast.error('Clipboard access unavailable in this browser context.');
+    }
   };
 
   return (
-    <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6 bg-slate-50/50">
+    <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6 bg-slate-50/50 dark:bg-slate-950 transition-colors">
       {/* Header */}
-      <div className="pb-3 border-b border-slate-200">
-        <h2 className="text-xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
-          <HelpCircle className="w-6 h-6 text-blue-600" />
-          <span>Help Center & Knowledgebase</span>
+      <div className="pb-3 border-b border-slate-200 dark:border-slate-800">
+        <h2 className="text-xl font-bold text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
+          <HelpCircle className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+          <span>Help Center & Diagnostics</span>
         </h2>
-        <p className="text-xs text-slate-500 mt-0.5">
-          Frequently asked questions, mobile installation guides, and support
+        <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+          Frequently asked questions, Android packaging architecture, and issue reporting
         </p>
       </div>
 
       <div className="max-w-3xl space-y-6">
         {/* FAQs */}
-        <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs space-y-3">
-          <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
-            <BookOpen className="w-4 h-4 text-blue-600" />
+        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 shadow-xs space-y-3">
+          <h3 className="font-bold text-slate-900 dark:text-white text-sm flex items-center gap-2">
+            <BookOpen className="w-4 h-4 text-blue-600 dark:text-blue-400" />
             <span>Frequently Asked Questions</span>
           </h3>
 
@@ -72,11 +90,11 @@ export const HelpSupportView: React.FC = () => {
             {faqs.map((faq, idx) => (
               <div
                 key={idx}
-                className="border border-slate-200 rounded-xl overflow-hidden text-xs"
+                className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden text-xs"
               >
                 <button
                   onClick={() => setOpenFaq(openFaq === idx ? null : idx)}
-                  className="w-full text-left p-3.5 bg-slate-50 hover:bg-slate-100 flex items-center justify-between font-semibold text-slate-800 transition"
+                  className="w-full text-left p-3.5 bg-slate-50 dark:bg-slate-850 hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center justify-between font-semibold text-slate-800 dark:text-slate-200 transition cursor-pointer"
                 >
                   <span>{faq.q}</span>
                   {openFaq === idx ? (
@@ -86,7 +104,7 @@ export const HelpSupportView: React.FC = () => {
                   )}
                 </button>
                 {openFaq === idx && (
-                  <div className="p-3.5 bg-white text-slate-600 text-xs leading-relaxed border-t border-slate-100">
+                  <div className="p-3.5 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 text-xs leading-relaxed border-t border-slate-100 dark:border-slate-800">
                     {faq.a}
                   </div>
                 )}
@@ -95,47 +113,45 @@ export const HelpSupportView: React.FC = () => {
           </div>
         </div>
 
-        {/* Support & Feedback Form */}
-        <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs space-y-3">
-          <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
-            <MessageSquare className="w-4 h-4 text-blue-600" />
-            <span>Support & Feature Feedback</span>
+        {/* Real Issue Reporting & Diagnostics */}
+        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 shadow-xs space-y-3">
+          <h3 className="font-bold text-slate-900 dark:text-white text-sm flex items-center gap-2">
+            <Terminal className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+            <span>Issue Reporting & Client Diagnostics</span>
           </h3>
-          <p className="text-xs text-slate-500">
-            Have a question or want to request a new cloud provider? Send a message directly to the engineering team.
+          <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+            This client runs serverless directly on your device with no support ticketing backend. You can copy sanitized client runtime diagnostics (without emails, tokens, or file names) or file an issue directly on GitHub.
           </p>
 
-          <form onSubmit={handleSendFeedback} className="space-y-3">
-            <textarea
-              rows={3}
-              required
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              placeholder="Describe your issue or suggest a feature..."
-              className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none focus:border-blue-500 focus:bg-white text-slate-800 transition"
-            />
-
-            <div className="flex items-center justify-between">
-              {feedbackSent ? (
-                <span className="text-xs text-emerald-600 font-semibold flex items-center gap-1.5">
-                  <CheckCircle2 className="w-4 h-4" />
-                  <span>Thank you! Your feedback has been received.</span>
-                </span>
+          <div className="flex flex-wrap items-center gap-2.5 pt-1">
+            <button
+              type="button"
+              onClick={() => void handleCopyDiagnostics()}
+              className="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-750 text-slate-800 dark:text-slate-200 text-xs font-semibold transition flex items-center gap-1.5 cursor-pointer"
+            >
+              {copiedDiagnostics ? (
+                <>
+                  <Check className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>Diagnostics Copied</span>
+                </>
               ) : (
-                <span className="text-[11px] text-slate-400">
-                  Response within 24 hours
-                </span>
+                <>
+                  <Copy className="w-3.5 h-3.5 text-slate-500" />
+                  <span>Copy Client Diagnostics</span>
+                </>
               )}
+            </button>
 
-              <button
-                type="submit"
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs rounded-xl shadow-xs transition flex items-center gap-1.5"
-              >
-                <span>Submit</span>
-                <Send className="w-3.5 h-3.5" />
-              </button>
-            </div>
-          </form>
+            <a
+              href="https://github.com/mohamedarman/Unified-cloud-file-manager/issues"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs rounded-xl shadow-xs transition inline-flex items-center gap-1.5"
+            >
+              <span>Open GitHub Issues</span>
+              <ExternalLink className="w-3.5 h-3.5" />
+            </a>
+          </div>
         </div>
       </div>
     </div>

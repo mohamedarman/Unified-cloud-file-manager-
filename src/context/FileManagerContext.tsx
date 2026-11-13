@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, ReactNode, useCallback } from 'react';
+import { auth as firebaseAuth } from '../firebase';
 import {
   AccountRef,
   AccountState,
@@ -16,12 +17,6 @@ import {
   ProviderSyncStatus,
   cacheKey,
 } from '../types';
-import {
-  INITIAL_ACCOUNTS,
-  INITIAL_CAPABILITIES,
-  INITIAL_FILES,
-  INITIAL_QUOTA,
-} from '../data/mockData';
 import { globalQuotaGovernor } from '../utils/quotaGovernor';
 import { Redactor } from '../utils/redactor';
 import {
@@ -29,6 +24,7 @@ import {
   collectDescendantFileKeys,
   computeTransferProgress,
   createEntityId,
+  createMonotonicIdAllocator,
   isDuplicateProviderAccount,
   wouldMoveCreateFolderCycle,
 } from '../utils/fileManagerLogic';
@@ -43,24 +39,9 @@ import { databaseService } from '../services/databaseService';
 
 export type NavigationTab =
   | 'dashboard'
-  | 'infra_overview'
-  | 'infra_compute'
-  | 'infra_storage'
-  | 'infra_databases'
-  | 'infra_networks'
-  | 'infra_k8s'
-  | 'infra_topology'
-  | 'providers'
   | 'accounts'
-  | 'monitoring_metrics'
-  | 'monitoring_logs'
-  | 'monitoring_alerts'
-  | 'monitoring_events'
   | 'security'
   | 'security_policies'
-  | 'cost_overview'
-  | 'cost_optimization'
-  | 'automation_workflows'
   | 'files'
   | 'gallery'
   | 'search'
@@ -134,7 +115,6 @@ interface FileManagerContextType {
   isMobilePreview: boolean;
   setIsMobilePreview: (val: boolean) => void;
 
-  // Account operations
   connectAccount: (
     provider: ProviderId,
     email: string,
@@ -152,7 +132,6 @@ interface FileManagerContextType {
   disconnectAccount: (accountId: LocalAccountId) => void;
   reconnectAccount: (accountId: LocalAccountId) => void;
 
-  // File mutations
   uploadFile: (accountId: LocalAccountId, folderId: string | null, file: File) => Promise<void>;
   downloadFile: (file: CloudFile) => Promise<void>;
   renameFile: (file: CloudFile, newName: string) => void;
@@ -165,17 +144,14 @@ interface FileManagerContextType {
   copyFile: (file: CloudFile, targetFolderId?: string | null) => void;
   createFolder: (accountId: LocalAccountId, name: string, parentFolderId: string | null) => void;
 
-  // Offline cache stats & management
   offlineCacheStats: OfflineCacheStats;
   evictOfflineCache: () => Promise<void>;
 
-  // Capabilities & Quotas
   capabilities: Record<number, ProviderCapabilities>;
   quotas: Record<number, QuotaUsage>;
   quotaSnapshot: QuotaSnapshot;
   refreshQuotaSnapshot: () => void;
 
-  // Pending ops & transfers
   pendingOperations: PendingOperation[];
   reconcileOperation: (id: number) => void;
   retryOperation: (id: number) => void;
@@ -186,16 +162,10 @@ interface FileManagerContextType {
   retryTransfer: (id: string) => void;
   pauseResumeTransfer: (id: string) => void;
 
-  // Background sync and connection status
   syncStatuses: Record<LocalAccountId, ProviderSyncStatus>;
   syncAccount: (accountId: LocalAccountId) => Promise<void>;
   syncAllAccounts: () => Promise<void>;
-  simulateProviderIssue: (
-    accountId: LocalAccountId,
-    issueType: 'none' | 'error' | 'warning'
-  ) => void;
 
-  // Audit logs
   auditLogs: AuditLogEntry[];
   addAuditLog: (
     accountId: LocalAccountId,
@@ -210,6 +180,13 @@ interface FileManagerContextType {
 }
 
 const FileManagerContext = createContext<FileManagerContextType | undefined>(undefined);
+
+function safePersistFirestore(fn: () => Promise<void>, label: string): void {
+  if (!firebaseAuth.currentUser?.uid) return;
+  void fn().catch((err) => {
+    console.warn(`Firestore ${label} warning:`, err);
+  });
+}
 
 export const FileManagerProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   function safeGetItem<T>(key: string, fallback: T): T {
@@ -271,16 +248,15 @@ export const FileManagerProvider: React.FC<{ children: ReactNode }> = ({ childre
 
   const transferAbortControllersRef = useRef<Map<string, AbortController>>(new Map());
   const transferSourcesRef = useRef<Map<string, TransferJobSource>>(new Map());
-  const nextOpSequenceRef = useRef<number>(1);
+  const opAllocatorRef = useRef<() => number>(
+    createMonotonicIdAllocator(
+      pendingOperations.reduce((max, op) => Math.max(max, op.id), 0)
+    )
+  );
 
-  const allocateOpId = (): number => {
-    const randomPart =
-      typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function'
-        ? crypto.getRandomValues(new Uint32Array(1))[0] % 900_000
-        : Math.floor(Math.random() * 900_000);
-    const id = Date.now() * 1000 + (nextOpSequenceRef.current++ % 1000) + randomPart;
-    return id;
-  };
+  const allocateOpId = useCallback((): number => {
+    return opAllocatorRef.current();
+  }, []);
 
   const refreshOfflineStats = async () => {
     const stats = await offlineCacheService.getStats();
@@ -295,19 +271,24 @@ export const FileManagerProvider: React.FC<{ children: ReactNode }> = ({ childre
     const localAccs = safeGetItem(accountsKey, defaultAccounts);
     const localFiles = safeGetItem(filesKey, defaultFiles);
     const localQuotas = safeGetItem(quotasKey, defaultQuotas);
+    const localOps = safeGetItem<PendingOperation[]>(pendingOpsKey, []);
+
+    opAllocatorRef.current = createMonotonicIdAllocator(
+      localOps.reduce((max, op) => Math.max(max, op.id), 0)
+    );
 
     setAccounts(localAccs);
     setFiles(localFiles);
     setCapabilities(safeGetItem(capabilitiesKey, defaultCapabilities));
     setQuotas(localQuotas);
-    setPendingOperations(safeGetItem(pendingOpsKey, []));
+    setPendingOperations(localOps);
     setAuditLogs(safeGetItem(auditLogsKey, []));
     setCurrentFolderId(null);
     setFolderHistory([]);
     setSelectedFileKeys(new Set());
     setInspectedFile(null);
 
-    if (userId !== 'guest_user') {
+    if (userId !== 'guest_user' && firebaseAuth.currentUser?.uid === userId) {
       void (async () => {
         const remote = await databaseService.loadUserWorkspace();
         if (remote) {
@@ -315,11 +296,17 @@ export const FileManagerProvider: React.FC<{ children: ReactNode }> = ({ childre
           if (remote.files && remote.files.length > 0) setFiles(remote.files);
           if (remote.quotas && Object.keys(remote.quotas).length > 0) setQuotas(remote.quotas);
           if (remote.operations && remote.operations.length > 0) {
+            opAllocatorRef.current = createMonotonicIdAllocator(
+              remote.operations.reduce((max, op) => Math.max(max, op.id), 0)
+            );
             setPendingOperations(remote.operations);
           }
           if (remote.auditLogs && remote.auditLogs.length > 0) setAuditLogs(remote.auditLogs);
           if (!remote.accounts && localAccs.length > 0) {
-            await databaseService.seedWorkspaceIfEmpty(localAccs, localFiles, localQuotas);
+            safePersistFirestore(
+              () => databaseService.seedWorkspaceIfEmpty(localAccs, localFiles, localQuotas),
+              'seedWorkspaceIfEmpty'
+            );
           }
         }
       })();
@@ -389,51 +376,266 @@ export const FileManagerProvider: React.FC<{ children: ReactNode }> = ({ childre
     localStorage.setItem('ucfm_sync_statuses_v2', JSON.stringify(syncStatuses));
   }, [syncStatuses]);
 
+  const addAuditLog = useCallback(
+    (
+      accountId: LocalAccountId,
+      action: string,
+      rawMessage: string,
+      fileId?: string,
+      severity: 'INFO' | 'WARN' | 'ERROR' = 'INFO'
+    ) => {
+      const redacted = Redactor.scrub(rawMessage);
+      const correlationTag = fileId ? Redactor.fileRefTag(accountId, fileId) : '000000000000';
+
+      const entry: AuditLogEntry = {
+        id: createEntityId('log'),
+        timestamp: Date.now(),
+        accountId,
+        action,
+        rawMessage,
+        redactedMessage: redacted,
+        correlationTag,
+        severity,
+      };
+
+      setAuditLogs((prev) => [entry, ...prev.slice(0, 99)]);
+      safePersistFirestore(() => databaseService.saveAuditLog(entry), 'saveAuditLog');
+    },
+    []
+  );
+
+  const refreshLiveQuotaForAccount = useCallback(async (account: AccountRef) => {
+    if (!cloudProviderService.hasLiveToken(account.localId)) return;
+    try {
+      const liveQuota = await cloudProviderService.fetchLiveQuota(account);
+      if (liveQuota) {
+        setQuotas((prev) => ({ ...prev, [account.localId]: liveQuota }));
+        safePersistFirestore(() => databaseService.saveQuota(liveQuota), 'saveQuota');
+      }
+    } catch (err) {
+      console.warn('Live quota refresh warning:', err);
+    }
+  }, []);
+
+  const executeQueuedRemoteOperation = useCallback(
+    async (op: PendingOperation) => {
+      const account = accounts.find((a) => a.localId === op.accountId);
+      if (!account) {
+        setPendingOperations((prev) =>
+          prev.map((item) =>
+            item.id === op.id
+              ? { ...item, state: 'FAILED', error: 'Connected account no longer exists.' }
+              : item
+          )
+        );
+        return;
+      }
+
+      setPendingOperations((prev) =>
+        prev.map((item) =>
+          item.id === op.id
+            ? {
+                ...item,
+                state: 'RUNNING',
+                attemptCount: item.attemptCount + 1,
+                lastAttemptAt: Date.now(),
+                error: undefined,
+              }
+            : item
+        )
+      );
+
+      let parsedPayload: Record<string, unknown> = {};
+      if (op.payload) {
+        try {
+          parsedPayload = JSON.parse(op.payload) as Record<string, unknown>;
+        } catch {
+          parsedPayload = {};
+        }
+      }
+
+      try {
+        if (op.operation === 'UPLOAD') {
+          const matchingTransfer = Array.from(transferSourcesRef.current.entries()).find(
+            ([, src]) =>
+              src.direction === 'UPLOAD' &&
+              src.accountId === op.accountId &&
+              src.uploadFileObj &&
+              (!op.fileName || src.uploadFileObj.name === op.fileName)
+          );
+          if (!matchingTransfer?.[1].uploadFileObj) {
+            throw new Error('Original local file handle unavailable after restart; select file to re-upload.');
+          }
+          await cloudProviderService.streamUploadBytes(
+            account,
+            matchingTransfer[1].folderId,
+            matchingTransfer[1].uploadFileObj,
+            new AbortController().signal,
+            () => {}
+          );
+        } else if (op.operation === 'DELETE_PERMANENTLY') {
+          const target = files.find(
+            (f) => f.ref.accountId === op.accountId && f.ref.fileId === op.fileId
+          ) || {
+            ref: {
+              provider: account.provider,
+              accountId: account.localId,
+              fileId: op.fileId || '',
+            },
+            name: op.fileName || 'item',
+            mimeType: 'application/octet-stream',
+            sizeBytes: null,
+            modifiedTimeMillis: Date.now(),
+            isFolder: false,
+            parentFolderId: null,
+            isShared: false,
+            isOwnedByUser: true,
+            isStarred: false,
+            isTrashed: true,
+          };
+          await cloudProviderService.deleteRemotePermanently(account, target);
+        } else {
+          await cloudProviderService.executeRemoteMutation(account, {
+            operation: op.operation,
+            fileId: op.fileId,
+            name:
+              typeof parsedPayload.new === 'string'
+                ? parsedPayload.new
+                : typeof parsedPayload.name === 'string'
+                ? parsedPayload.name
+                : op.fileName,
+            targetFolderId:
+              typeof parsedPayload.targetFolderId === 'string'
+                ? parsedPayload.targetFolderId
+                : typeof parsedPayload.folderId === 'string'
+                ? parsedPayload.folderId
+                : null,
+          });
+        }
+
+        const completed: PendingOperation = {
+          ...op,
+          state: 'COMPLETED',
+          attemptCount: op.attemptCount + 1,
+          lastAttemptAt: Date.now(),
+          outcomeUncertain: false,
+          error: undefined,
+        };
+        setPendingOperations((prev) =>
+          prev.map((item) => (item.id === op.id ? completed : item))
+        );
+        offlineCacheService.markNativeOperationState(op.id, 'COMPLETED');
+        safePersistFirestore(() => databaseService.saveOperation(completed), 'saveOperation');
+        addAuditLog(
+          op.accountId,
+          'OPERATION_COMPLETED',
+          `Executed remote operation ${op.operation} for ${op.fileName || op.fileId || 'item'}.`,
+          op.fileId || undefined
+        );
+        void refreshLiveQuotaForAccount(account);
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : 'Remote operation failed';
+        const failed: PendingOperation = {
+          ...op,
+          state: 'FAILED',
+          attemptCount: op.attemptCount + 1,
+          lastAttemptAt: Date.now(),
+          outcomeUncertain: true,
+          error: msg,
+        };
+        setPendingOperations((prev) => prev.map((item) => (item.id === op.id ? failed : item)));
+        offlineCacheService.markNativeOperationState(op.id, 'FAILED');
+        safePersistFirestore(() => databaseService.saveOperation(failed), 'saveOperation');
+        addAuditLog(
+          op.accountId,
+          'OPERATION_FAILED',
+          `Operation ${op.operation} failed: ${msg}`,
+          op.fileId || undefined,
+          'ERROR'
+        );
+      }
+    },
+    [accounts, files, addAuditLog, refreshLiveQuotaForAccount]
+  );
+
   // Replay queued offline operations when network reconnects
   useEffect(() => {
     const handleOnline = () => {
-      setPendingOperations((prev) =>
-        prev.map((op) =>
-          op.state === 'QUEUED'
-            ? {
-                ...op,
-                state: 'COMPLETED',
-                lastAttemptAt: Date.now(),
-                attemptCount: op.attemptCount + 1,
-                outcomeUncertain: false,
-              }
-            : op
-        )
-      );
+      const queued = pendingOperations.filter((op) => op.state === 'QUEUED');
+      queued.forEach((op) => {
+        void executeQueuedRemoteOperation(op);
+      });
     };
     window.addEventListener('online', handleOnline);
     return () => window.removeEventListener('online', handleOnline);
-  }, []);
+  }, [pendingOperations, executeQueuedRemoteOperation]);
 
-  const addAuditLog = (
-    accountId: LocalAccountId,
-    action: string,
-    rawMessage: string,
-    fileId?: string,
-    severity: 'INFO' | 'WARN' | 'ERROR' = 'INFO'
-  ) => {
-    const redacted = Redactor.scrub(rawMessage);
-    const correlationTag = fileId ? Redactor.fileRefTag(accountId, fileId) : '000000000000';
-
-    const entry: AuditLogEntry = {
-      id: createEntityId('log'),
-      timestamp: Date.now(),
-      accountId,
-      action,
-      rawMessage,
-      redactedMessage: redacted,
-      correlationTag,
-      severity,
+  // Complete Chrome Custom Tabs / OAuth redirect callback if returning to app
+  useEffect(() => {
+    const checkCallback = async () => {
+      try {
+        const completed = await cloudProviderService.completePendingOAuthCallback();
+        if (!completed) return;
+        const { account: verified, badgeLabel } = completed;
+        setAccounts((prev) => {
+          if (
+            isDuplicateProviderAccount(
+              prev,
+              verified.provider,
+              verified.displayEmail,
+              verified.providerAccountId
+            )
+          ) {
+            return prev;
+          }
+          const newId = (prev.reduce((max, a) => Math.max(max, a.localId), 0) + 1) as LocalAccountId;
+          const providerMeta = PROVIDERS[verified.provider];
+          const newAccount: AccountRef = {
+            localId: newId,
+            provider: verified.provider,
+            providerAccountId: verified.providerAccountId,
+            displayEmail: verified.displayEmail,
+            displayName: verified.displayName,
+            color: providerMeta.brandColor,
+            badgeLabel: badgeLabel || providerMeta.shortName,
+            state: AccountState.CONNECTED,
+            grantedScopes: verified.grantedScopes,
+            lastVerifiedAt: Date.now(),
+          };
+          cloudProviderService.storeTokenForAccount(newId, {
+            accessToken: verified.accessToken,
+            refreshToken: verified.refreshToken,
+            expiresAtMillis: verified.expiresAtMillis,
+            grantedScopes: verified.grantedScopes,
+            provider: verified.provider,
+            providerAccountId: verified.providerAccountId,
+            displayEmail: verified.displayEmail,
+          });
+          const newQuota: QuotaUsage = {
+            providerId: verified.provider,
+            accountId: newId,
+            usedBytes: verified.quota.usedBytes,
+            limitBytes: verified.quota.limitBytes ?? providerMeta.defaultQuotaBytes,
+            manageUrl: providerMeta.manageUrl,
+          };
+          setCapabilities((cPrev) => ({
+            ...cPrev,
+            [newId]: buildCapabilitiesForProvider(verified.provider, verified.grantedScopes),
+          }));
+          setQuotas((qPrev) => ({ ...qPrev, [newId]: newQuota }));
+          safePersistFirestore(() => databaseService.saveAccount(newAccount, newQuota), 'saveAccount');
+          return [...prev, newAccount];
+        });
+      } catch (err) {
+        console.warn('Pending OAuth callback handling warning:', err);
+      }
     };
 
-    setAuditLogs((prev) => [entry, ...prev.slice(0, 99)]);
-    void databaseService.saveAuditLog(entry);
-  };
+    void checkCallback();
+    const onFocus = () => void checkCallback();
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
+  }, []);
 
   const navigateToFolder = (folderId: string | null) => {
     setFolderHistory((prev) => [...prev, currentFolderId ?? '__ROOT__']);
@@ -525,6 +727,9 @@ export const FileManagerProvider: React.FC<{ children: ReactNode }> = ({ childre
         refreshToken: verifiedAccount.refreshToken,
         expiresAtMillis: verifiedAccount.expiresAtMillis,
         grantedScopes: newAccount.grantedScopes,
+        provider,
+        providerAccountId: newAccount.providerAccountId,
+        displayEmail: newAccount.displayEmail,
       });
     }
 
@@ -562,7 +767,7 @@ export const FileManagerProvider: React.FC<{ children: ReactNode }> = ({ childre
       },
     }));
 
-    void databaseService.saveAccount(newAccount, newQuota);
+    safePersistFirestore(() => databaseService.saveAccount(newAccount, newQuota), 'saveAccount');
 
     addAuditLog(
       newId,
@@ -580,7 +785,8 @@ export const FileManagerProvider: React.FC<{ children: ReactNode }> = ({ childre
     const verified = await cloudProviderService.authorizeAndVerifyAccount(
       provider,
       scopes,
-      explicitAccessToken
+      explicitAccessToken,
+      badgeLabel
     );
 
     if (
@@ -616,6 +822,9 @@ export const FileManagerProvider: React.FC<{ children: ReactNode }> = ({ childre
       refreshToken: verified.refreshToken,
       expiresAtMillis: verified.expiresAtMillis,
       grantedScopes: verified.grantedScopes,
+      provider,
+      providerAccountId: verified.providerAccountId,
+      displayEmail: verified.displayEmail,
     });
 
     const newQuota: QuotaUsage = {
@@ -632,7 +841,6 @@ export const FileManagerProvider: React.FC<{ children: ReactNode }> = ({ childre
     setCapabilities((prev) => ({ ...prev, [newId]: computedCapabilities }));
     setQuotas((prev) => ({ ...prev, [newId]: newQuota }));
 
-    // Fetch live files from the verified provider account immediately
     try {
       const remoteFiles = await cloudProviderService.listRemoteFiles(newAccount, null);
       if (remoteFiles && remoteFiles.length > 0) {
@@ -640,7 +848,9 @@ export const FileManagerProvider: React.FC<{ children: ReactNode }> = ({ childre
           ...remoteFiles,
           ...prev.filter((f) => f.ref.accountId !== newId),
         ]);
-        remoteFiles.forEach((f) => void databaseService.saveFile(f));
+        remoteFiles.forEach((f) =>
+          safePersistFirestore(() => databaseService.saveFile(f), 'saveFile')
+        );
       }
       setSyncStatuses((prev) => ({
         ...prev,
@@ -658,7 +868,7 @@ export const FileManagerProvider: React.FC<{ children: ReactNode }> = ({ childre
       console.warn('Initial file listing warning:', listErr);
     }
 
-    void databaseService.saveAccount(newAccount, newQuota);
+    safePersistFirestore(() => databaseService.saveAccount(newAccount, newQuota), 'saveAccount');
     addAuditLog(
       newId,
       'ACCOUNT_CONNECTED',
@@ -682,7 +892,6 @@ export const FileManagerProvider: React.FC<{ children: ReactNode }> = ({ childre
       )}. Cancelling active transfers, revoking OAuth tokens, and purging cached files.`
     );
 
-    // Cancel and remove all active transfers for this account
     setTransfers((prev) => {
       prev.forEach((t) => {
         if (t.ref.accountId === accountId) {
@@ -695,14 +904,11 @@ export const FileManagerProvider: React.FC<{ children: ReactNode }> = ({ childre
       return prev.filter((t) => t.ref.accountId !== accountId);
     });
 
-    // Remove all pending operations for this account
     setPendingOperations((prev) => prev.filter((op) => op.accountId !== accountId));
 
-    // Purge offline cached blobs and revoke provider OAuth tokens
     void offlineCacheService.purgeAccountCache(accountId).then(() => refreshOfflineStats());
     void cloudProviderService.revokeAccountToken(account);
 
-    // Purge files, capabilities, quotas, syncStatuses, and account record
     setFiles((prev) => prev.filter((f) => f.ref.accountId !== accountId));
     setCapabilities((prev) => {
       const next = { ...prev };
@@ -720,7 +926,7 @@ export const FileManagerProvider: React.FC<{ children: ReactNode }> = ({ childre
       return next;
     });
     setAccounts((prev) => prev.filter((a) => a.localId !== accountId));
-    void databaseService.removeAccount(accountId);
+    safePersistFirestore(() => databaseService.removeAccount(accountId), 'removeAccount');
 
     if (inspectedFile?.ref.accountId === accountId) {
       setInspectedFile(null);
@@ -737,7 +943,7 @@ export const FileManagerProvider: React.FC<{ children: ReactNode }> = ({ childre
       prev.map((a) => {
         if (a.localId !== accountId) return a;
         const updated = { ...a, state: AccountState.CONNECTED, lastVerifiedAt: Date.now() };
-        void databaseService.saveAccount(updated);
+        safePersistFirestore(() => databaseService.saveAccount(updated), 'saveAccount');
         return updated;
       })
     );
@@ -883,22 +1089,11 @@ export const FileManagerProvider: React.FC<{ children: ReactNode }> = ({ childre
       setFiles((prev) => [newCloudFile, ...prev]);
       setPendingOperations((prev) => prev.map((op) => (op.id === opId ? completedOp : op)));
 
-      void databaseService.saveFile(newCloudFile);
-      void databaseService.saveOperation(completedOp);
+      safePersistFirestore(() => databaseService.saveFile(newCloudFile), 'saveFile');
+      safePersistFirestore(() => databaseService.saveOperation(completedOp), 'saveOperation');
+      offlineCacheService.markNativeOperationState(opId, 'COMPLETED');
 
-      setQuotas((prev) => {
-        const current = prev[accountId];
-        if (!current) return prev;
-        const updatedQuota: QuotaUsage = {
-          ...current,
-          usedBytes: current.usedBytes + file.size,
-        };
-        void databaseService.saveQuota(updatedQuota);
-        return {
-          ...prev,
-          [accountId]: updatedQuota,
-        };
-      });
+      void refreshLiveQuotaForAccount(account);
 
       addAuditLog(
         accountId,
@@ -907,8 +1102,7 @@ export const FileManagerProvider: React.FC<{ children: ReactNode }> = ({ childre
         finalFileId
       );
     } catch (err: unknown) {
-      const isAbort =
-        err instanceof DOMException && err.name === 'AbortError';
+      const isAbort = err instanceof DOMException && err.name === 'AbortError';
       if (isAbort) {
         return;
       }
@@ -921,6 +1115,7 @@ export const FileManagerProvider: React.FC<{ children: ReactNode }> = ({ childre
       setPendingOperations((prev) =>
         prev.map((op) => (op.id === opId ? { ...op, state: 'FAILED', error: errMsg } : op))
       );
+      offlineCacheService.markNativeOperationState(opId, 'FAILED');
       addAuditLog(accountId, 'UPLOAD_FAILED', `Upload failed for ${file.name}: ${errMsg}`, fileId, 'ERROR');
       throw err;
     } finally {
@@ -980,6 +1175,31 @@ export const FileManagerProvider: React.FC<{ children: ReactNode }> = ({ childre
       startedAt: Date.now(),
     };
     setTransfers((prev) => [transferItem, ...prev]);
+
+    if (isOffline) {
+      transferSourcesRef.current.set(transferId, {
+        direction: 'UPLOAD',
+        accountId,
+        folderId,
+        uploadFileObj: file,
+      });
+      offlineCacheService.enqueueNativeOperation(
+        accountId,
+        account.provider,
+        'UPLOAD',
+        fileId,
+        newOp.payload
+      );
+      safePersistFirestore(() => databaseService.saveOperation(newOp), 'saveOperation');
+      addAuditLog(
+        accountId,
+        'UPLOAD_QUEUED',
+        `Network offline; queued upload ${file.name} for replay on reconnect.`,
+        fileId,
+        'WARN'
+      );
+      return;
+    }
 
     await executeUploadTransfer(transferId, opId, account, folderId, file, fileRef);
   };
@@ -1079,14 +1299,21 @@ export const FileManagerProvider: React.FC<{ children: ReactNode }> = ({ childre
         )
       );
 
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = file.name;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      const savedNatively = await offlineCacheService.saveBlobToDownloads(
+        file.name,
+        file.mimeType,
+        blob
+      );
+      if (!savedNatively) {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = file.name;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+      }
 
       addAuditLog(
         file.ref.accountId,
@@ -1111,6 +1338,7 @@ export const FileManagerProvider: React.FC<{ children: ReactNode }> = ({ childre
         file.ref.fileId,
         'ERROR'
       );
+      throw err;
     } finally {
       transferAbortControllersRef.current.delete(transferId);
       globalQuotaGovernor.release(file.ref.accountId);
@@ -1118,26 +1346,80 @@ export const FileManagerProvider: React.FC<{ children: ReactNode }> = ({ childre
     }
   };
 
-  const renameFile = (file: CloudFile, newName: string) => {
-    const trimmed = newName.trim();
-    if (!trimmed) return;
+  const dispatchMutationOperation = (
+    account: AccountRef | undefined,
+    operation: PendingOperation['operation'],
+    fileId: string | null,
+    fileName: string,
+    payloadObj: Record<string, unknown>,
+    remoteCall: () => Promise<void>
+  ) => {
     const opId = allocateOpId();
     const isOffline = typeof navigator !== 'undefined' && navigator.onLine === false;
-    const op: PendingOperation = {
+    const payload = JSON.stringify(payloadObj);
+
+    const hasLiveToken = account ? cloudProviderService.hasLiveToken(account.localId) : false;
+    const initialOp: PendingOperation = {
       id: opId,
-      accountId: file.ref.accountId,
-      operation: 'RENAME',
-      fileId: file.ref.fileId,
-      fileName: trimmed,
-      payload: JSON.stringify({ old: file.name, new: trimmed }),
-      state: isOffline ? 'QUEUED' : 'COMPLETED',
+      accountId: account?.localId ?? 0,
+      operation,
+      fileId,
+      fileName,
+      payload,
+      state: isOffline ? 'QUEUED' : hasLiveToken ? 'RUNNING' : 'FAILED',
       createdAt: Date.now(),
       lastAttemptAt: Date.now(),
       attemptCount: 1,
       outcomeUncertain: false,
+      error:
+        !isOffline && !hasLiveToken
+          ? `Active OAuth token required for ${operation} sync.`
+          : undefined,
     };
-    setPendingOperations((prev) => [op, ...prev]);
 
+    setPendingOperations((prev) => [initialOp, ...prev]);
+    if (account) {
+      offlineCacheService.enqueueNativeOperation(
+        account.localId,
+        account.provider,
+        operation,
+        fileId,
+        payload
+      );
+    }
+    safePersistFirestore(() => databaseService.saveOperation(initialOp), 'saveOperation');
+
+    if (isOffline || !account || !hasLiveToken) {
+      return;
+    }
+
+    void (async () => {
+      try {
+        await remoteCall();
+        const completed: PendingOperation = { ...initialOp, state: 'COMPLETED' };
+        setPendingOperations((prev) => prev.map((o) => (o.id === opId ? completed : o)));
+        offlineCacheService.markNativeOperationState(opId, 'COMPLETED');
+        safePersistFirestore(() => databaseService.saveOperation(completed), 'saveOperation');
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : `${operation} failed remotely`;
+        const failed: PendingOperation = {
+          ...initialOp,
+          state: 'FAILED',
+          outcomeUncertain: true,
+          error: msg,
+        };
+        setPendingOperations((prev) => prev.map((o) => (o.id === opId ? failed : o)));
+        offlineCacheService.markNativeOperationState(opId, 'FAILED');
+        safePersistFirestore(() => databaseService.saveOperation(failed), 'saveOperation');
+        addAuditLog(account.localId, `${operation}_FAILED`, msg, fileId || undefined, 'ERROR');
+      }
+    })();
+  };
+
+  const renameFile = (file: CloudFile, newName: string) => {
+    const trimmed = newName.trim();
+    if (!trimmed) return;
+    const account = accounts.find((a) => a.localId === file.ref.accountId);
     const updatedFile: CloudFile = {
       ...file,
       name: trimmed,
@@ -1146,13 +1428,27 @@ export const FileManagerProvider: React.FC<{ children: ReactNode }> = ({ childre
     setFiles((prev) =>
       prev.map((f) => (cacheKey(f.ref) === cacheKey(file.ref) ? updatedFile : f))
     );
-
     if (inspectedFile && cacheKey(inspectedFile.ref) === cacheKey(file.ref)) {
       setInspectedFile(updatedFile);
     }
+    safePersistFirestore(() => databaseService.saveFile(updatedFile), 'saveFile');
 
-    void databaseService.saveFile(updatedFile);
-    void databaseService.saveOperation(op);
+    dispatchMutationOperation(
+      account,
+      'RENAME',
+      file.ref.fileId,
+      trimmed,
+      { old: file.name, new: trimmed },
+      async () => {
+        if (account) {
+          await cloudProviderService.executeRemoteMutation(account, {
+            operation: 'RENAME',
+            fileId: file.ref.fileId,
+            name: trimmed,
+          });
+        }
+      }
+    );
     addAuditLog(file.ref.accountId, 'RENAME_FILE', `Renamed file to ${trimmed}`, file.ref.fileId);
   };
 
@@ -1171,6 +1467,7 @@ export const FileManagerProvider: React.FC<{ children: ReactNode }> = ({ childre
       throw new Error('Cannot move a folder into itself or one of its descendants.');
     }
 
+    const account = accounts.find((a) => a.localId === file.ref.accountId);
     const updatedFile: CloudFile = {
       ...file,
       parentFolderId: targetFolderId,
@@ -1179,8 +1476,26 @@ export const FileManagerProvider: React.FC<{ children: ReactNode }> = ({ childre
     setFiles((prev) =>
       prev.map((f) => (cacheKey(f.ref) === cacheKey(file.ref) ? updatedFile : f))
     );
+    safePersistFirestore(() => databaseService.saveFile(updatedFile), 'saveFile');
 
-    void databaseService.saveFile(updatedFile);
+    dispatchMutationOperation(
+      account,
+      'MOVE',
+      file.ref.fileId,
+      file.name,
+      { targetFolderId },
+      async () => {
+        if (account) {
+          await cloudProviderService.executeRemoteMutation(account, {
+            operation: 'MOVE',
+            fileId: file.ref.fileId,
+            targetFolderId,
+            name: file.name,
+          });
+        }
+      }
+    );
+
     addAuditLog(
       file.ref.accountId,
       'MOVE_FILE',
@@ -1190,18 +1505,34 @@ export const FileManagerProvider: React.FC<{ children: ReactNode }> = ({ childre
   };
 
   const trashFile = (file: CloudFile) => {
+    const account = accounts.find((a) => a.localId === file.ref.accountId);
     const affectedKeys = collectDescendantFileKeys(file, files);
     setFiles((prev) =>
       prev.map((f) => {
         if (!affectedKeys.has(cacheKey(f.ref))) return f;
         const updated = { ...f, isTrashed: true, modifiedTimeMillis: Date.now() };
-        void databaseService.saveFile(updated);
+        safePersistFirestore(() => databaseService.saveFile(updated), 'saveFile');
         return updated;
       })
     );
     if (inspectedFile && affectedKeys.has(cacheKey(inspectedFile.ref))) {
       setInspectedFile({ ...inspectedFile, isTrashed: true });
     }
+    dispatchMutationOperation(
+      account,
+      'TRASH',
+      file.ref.fileId,
+      file.name,
+      {},
+      async () => {
+        if (account) {
+          await cloudProviderService.executeRemoteMutation(account, {
+            operation: 'TRASH',
+            fileId: file.ref.fileId,
+          });
+        }
+      }
+    );
     addAuditLog(
       file.ref.accountId,
       'TRASH_FILE',
@@ -1211,18 +1542,34 @@ export const FileManagerProvider: React.FC<{ children: ReactNode }> = ({ childre
   };
 
   const restoreFile = (file: CloudFile) => {
+    const account = accounts.find((a) => a.localId === file.ref.accountId);
     const affectedKeys = collectDescendantFileKeys(file, files);
     setFiles((prev) =>
       prev.map((f) => {
         if (!affectedKeys.has(cacheKey(f.ref))) return f;
         const updated = { ...f, isTrashed: false, modifiedTimeMillis: Date.now() };
-        void databaseService.saveFile(updated);
+        safePersistFirestore(() => databaseService.saveFile(updated), 'saveFile');
         return updated;
       })
     );
     if (inspectedFile && affectedKeys.has(cacheKey(inspectedFile.ref))) {
       setInspectedFile({ ...inspectedFile, isTrashed: false });
     }
+    dispatchMutationOperation(
+      account,
+      'RESTORE',
+      file.ref.fileId,
+      file.name,
+      {},
+      async () => {
+        if (account) {
+          await cloudProviderService.executeRemoteMutation(account, {
+            operation: 'RESTORE',
+            fileId: file.ref.fileId,
+          });
+        }
+      }
+    );
     addAuditLog(
       file.ref.accountId,
       'RESTORE_FILE',
@@ -1243,14 +1590,27 @@ export const FileManagerProvider: React.FC<{ children: ReactNode }> = ({ childre
     }
 
     deletedFiles.forEach((f) => {
-      void databaseService.removeFile(f);
+      safePersistFirestore(() => databaseService.removeFile(f), 'removeFile');
       if (f.isOfflineAvailable) {
         void offlineCacheService.unpinFile(f.ref).then(() => refreshOfflineStats());
       }
-      if (account) {
-        void cloudProviderService.deleteRemotePermanently(account, f);
-      }
     });
+
+    if (account) {
+      dispatchMutationOperation(
+        account,
+        'DELETE_PERMANENTLY',
+        file.ref.fileId,
+        file.name,
+        { freedBytes },
+        async () => {
+          for (const target of deletedFiles) {
+            await cloudProviderService.deleteRemotePermanently(account, target);
+          }
+          await refreshLiveQuotaForAccount(account);
+        }
+      );
+    }
 
     if (freedBytes > 0) {
       setQuotas((prev) => {
@@ -1260,7 +1620,7 @@ export const FileManagerProvider: React.FC<{ children: ReactNode }> = ({ childre
           ...current,
           usedBytes: Math.max(0, current.usedBytes - freedBytes),
         };
-        void databaseService.saveQuota(updatedQuota);
+        safePersistFirestore(() => databaseService.saveQuota(updatedQuota), 'saveQuota');
         return {
           ...prev,
           [file.ref.accountId]: updatedQuota,
@@ -1290,6 +1650,7 @@ export const FileManagerProvider: React.FC<{ children: ReactNode }> = ({ childre
       return;
     }
 
+    const account = accounts.find((a) => a.localId === file.ref.accountId);
     const nextStarred = !file.isStarred;
     const updatedFile: CloudFile = { ...file, isStarred: nextStarred };
     setFiles((prev) =>
@@ -1298,7 +1659,26 @@ export const FileManagerProvider: React.FC<{ children: ReactNode }> = ({ childre
     if (inspectedFile && cacheKey(inspectedFile.ref) === cacheKey(file.ref)) {
       setInspectedFile(updatedFile);
     }
-    void databaseService.saveFile(updatedFile);
+    safePersistFirestore(() => databaseService.saveFile(updatedFile), 'saveFile');
+
+    if (account && cloudProviderService.hasLiveToken(account.localId)) {
+      void cloudProviderService
+        .executeRemoteMutation(account, {
+          operation: 'STAR',
+          fileId: file.ref.fileId,
+          starred: nextStarred,
+        })
+        .catch((err: unknown) => {
+          addAuditLog(
+            file.ref.accountId,
+            'STAR_SYNC_ERROR',
+            err instanceof Error ? err.message : 'Failed to update star status remotely.',
+            file.ref.fileId,
+            'ERROR'
+          );
+        });
+    }
+
     addAuditLog(
       file.ref.accountId,
       'STAR_FILE',
@@ -1310,37 +1690,64 @@ export const FileManagerProvider: React.FC<{ children: ReactNode }> = ({ childre
   const toggleOffline = (file: CloudFile) => {
     if (file.isFolder) return;
     const nextOffline = !file.isOfflineAvailable;
-    const updatedFile: CloudFile = { ...file, isOfflineAvailable: nextOffline };
+    const account = accounts.find((a) => a.localId === file.ref.accountId);
 
-    setFiles((prev) =>
-      prev.map((f) => (cacheKey(f.ref) === cacheKey(file.ref) ? updatedFile : f))
-    );
-    if (inspectedFile && cacheKey(inspectedFile.ref) === cacheKey(file.ref)) {
-      setInspectedFile(updatedFile);
+    if (!nextOffline) {
+      const updatedFile: CloudFile = { ...file, isOfflineAvailable: false };
+      setFiles((prev) =>
+        prev.map((f) => (cacheKey(f.ref) === cacheKey(file.ref) ? updatedFile : f))
+      );
+      if (inspectedFile && cacheKey(inspectedFile.ref) === cacheKey(file.ref)) {
+        setInspectedFile(updatedFile);
+      }
+      safePersistFirestore(() => databaseService.saveFile(updatedFile), 'saveFile');
+      void offlineCacheService.unpinFile(file.ref).then(() => refreshOfflineStats());
+      addAuditLog(
+        file.ref.accountId,
+        'OFFLINE_EVICT',
+        `Evicted ${file.name} from local offline byte cache`,
+        file.ref.fileId
+      );
+      return;
     }
-    void databaseService.saveFile(updatedFile);
 
     void (async () => {
-      if (nextOffline) {
-        const textBytes = new TextEncoder().encode(
-          file.previewText || `Offline cached bytes for ${file.name} (${file.mimeType})`
+      try {
+        const blob = await cloudProviderService.streamDownloadBytes(
+          account,
+          file,
+          new AbortController().signal,
+          () => {}
         );
-        const byteLength = file.sizeBytes && file.sizeBytes > 0 ? Math.min(file.sizeBytes, 65_536) : textBytes.byteLength;
-        const buffer = new Uint8Array(Math.max(byteLength, textBytes.byteLength));
-        buffer.set(textBytes.slice(0, buffer.length));
-        await offlineCacheService.pinFileBytes(updatedFile, buffer.buffer);
-      } else {
-        await offlineCacheService.unpinFile(file.ref);
+        const bytes = await blob.arrayBuffer();
+        const updatedFile: CloudFile = { ...file, isOfflineAvailable: true };
+        await offlineCacheService.pinFileBytes(updatedFile, bytes);
+        setFiles((prev) =>
+          prev.map((f) => (cacheKey(f.ref) === cacheKey(file.ref) ? updatedFile : f))
+        );
+        if (inspectedFile && cacheKey(inspectedFile.ref) === cacheKey(file.ref)) {
+          setInspectedFile(updatedFile);
+        }
+        safePersistFirestore(() => databaseService.saveFile(updatedFile), 'saveFile');
+        await refreshOfflineStats();
+        addAuditLog(
+          file.ref.accountId,
+          'OFFLINE_PIN',
+          `Pinned ${file.name} (${bytes.byteLength} bytes) in local offline byte cache`,
+          file.ref.fileId
+        );
+      } catch (err: unknown) {
+        const msg =
+          err instanceof Error ? err.message : 'Unable to fetch file bytes for offline pin.';
+        addAuditLog(
+          file.ref.accountId,
+          'OFFLINE_PIN_FAILED',
+          `Offline pin failed for ${file.name}: ${msg}`,
+          file.ref.fileId,
+          'ERROR'
+        );
       }
-      await refreshOfflineStats();
     })();
-
-    addAuditLog(
-      file.ref.accountId,
-      'OFFLINE_PIN',
-      `${nextOffline ? 'Pinned' : 'Evicted'} ${file.name} in local offline byte cache`,
-      file.ref.fileId
-    );
   };
 
   const evictOfflineCache = async () => {
@@ -1353,6 +1760,7 @@ export const FileManagerProvider: React.FC<{ children: ReactNode }> = ({ childre
   };
 
   const copyFile = (file: CloudFile, targetFolderId?: string | null) => {
+    const account = accounts.find((a) => a.localId === file.ref.accountId);
     const { clones, totalCopiedBytes } = cloneFolderHierarchyRecursively(
       file,
       targetFolderId,
@@ -1360,7 +1768,26 @@ export const FileManagerProvider: React.FC<{ children: ReactNode }> = ({ childre
     );
 
     setFiles((prev) => [...clones, ...prev]);
-    clones.forEach((clone) => void databaseService.saveFile(clone));
+    clones.forEach((clone) => safePersistFirestore(() => databaseService.saveFile(clone), 'saveFile'));
+
+    if (account) {
+      dispatchMutationOperation(
+        account,
+        'COPY',
+        file.ref.fileId,
+        clones[0].name,
+        { targetFolderId: targetFolderId ?? file.parentFolderId ?? null },
+        async () => {
+          await cloudProviderService.executeRemoteMutation(account, {
+            operation: 'COPY',
+            fileId: file.ref.fileId,
+            name: clones[0].name,
+            targetFolderId: targetFolderId ?? file.parentFolderId ?? null,
+          });
+          await refreshLiveQuotaForAccount(account);
+        }
+      );
+    }
 
     if (totalCopiedBytes > 0) {
       setQuotas((prev) => {
@@ -1370,7 +1797,7 @@ export const FileManagerProvider: React.FC<{ children: ReactNode }> = ({ childre
           ...current,
           usedBytes: current.usedBytes + totalCopiedBytes,
         };
-        void databaseService.saveQuota(updatedQuota);
+        safePersistFirestore(() => databaseService.saveQuota(updatedQuota), 'saveQuota');
         return {
           ...prev,
           [file.ref.accountId]: updatedQuota,
@@ -1390,10 +1817,11 @@ export const FileManagerProvider: React.FC<{ children: ReactNode }> = ({ childre
     const account = accounts.find((a) => a.localId === accountId);
     if (!account) return;
 
+    const folderName = name.trim() || 'New Folder';
     const folderId = createEntityId('folder');
     const newFolder: CloudFile = {
       ref: { provider: account.provider, accountId, fileId: folderId },
-      name: name.trim() || 'New Folder',
+      name: folderName,
       mimeType: 'application/vnd.google-apps.folder',
       sizeBytes: null,
       modifiedTimeMillis: Date.now(),
@@ -1406,43 +1834,74 @@ export const FileManagerProvider: React.FC<{ children: ReactNode }> = ({ childre
     };
 
     setFiles((prev) => [newFolder, ...prev]);
-    void databaseService.saveFile(newFolder);
-    addAuditLog(accountId, 'CREATE_FOLDER', `Created folder "${newFolder.name}" in ${account.badgeLabel}`, folderId);
+    safePersistFirestore(() => databaseService.saveFile(newFolder), 'saveFile');
+
+    dispatchMutationOperation(
+      account,
+      'CREATE_FOLDER',
+      folderId,
+      folderName,
+      { targetFolderId: parentFolderId },
+      async () => {
+        const remote = await cloudProviderService.executeRemoteMutation(account, {
+          operation: 'CREATE_FOLDER',
+          fileId: null,
+          name: folderName,
+          targetFolderId: parentFolderId,
+        });
+        if (remote.remoteId && remote.remoteId !== folderId) {
+          const updatedRemoteFolder: CloudFile = {
+            ...newFolder,
+            ref: { ...newFolder.ref, fileId: remote.remoteId },
+          };
+          setFiles((prev) =>
+            prev.map((f) => (f.ref.fileId === folderId ? updatedRemoteFolder : f))
+          );
+          safePersistFirestore(() => databaseService.saveFile(updatedRemoteFolder), 'saveFile');
+        }
+      }
+    );
+
+    addAuditLog(accountId, 'CREATE_FOLDER', `Created folder "${folderName}" in ${account.badgeLabel}`, folderId);
   };
 
   const reconcileOperation = (id: number) => {
-    setPendingOperations((prev) =>
-      prev.map((op) =>
-        op.id === id ? { ...op, state: 'COMPLETED', outcomeUncertain: false, error: undefined } : op
-      )
-    );
+    const target = pendingOperations.find((op) => op.id === id);
+    if (!target) return;
+    const account = accounts.find((a) => a.localId === target.accountId);
+    if (!account) return;
+
+    void (async () => {
+      try {
+        const remoteFiles = await cloudProviderService.listRemoteFiles(account, null);
+        const confirmed =
+          Boolean(target.fileId) &&
+          Boolean(remoteFiles?.some((f) => f.ref.fileId === target.fileId || f.name === target.fileName));
+        if (confirmed) {
+          const resolved: PendingOperation = {
+            ...target,
+            state: 'COMPLETED',
+            outcomeUncertain: false,
+            error: undefined,
+          };
+          setPendingOperations((prev) => prev.map((op) => (op.id === id ? resolved : op)));
+          offlineCacheService.markNativeOperationState(id, 'COMPLETED');
+        } else {
+          await executeQueuedRemoteOperation(target);
+        }
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : 'Reconciliation check failed.';
+        setPendingOperations((prev) =>
+          prev.map((op) => (op.id === id ? { ...op, state: 'FAILED', error: msg } : op))
+        );
+      }
+    })();
   };
 
   const retryOperation = (id: number) => {
     const targetOp = pendingOperations.find((op) => op.id === id);
     if (!targetOp) return;
-
-    setPendingOperations((prev) =>
-      prev.map((op) =>
-        op.id === id
-          ? {
-              ...op,
-              state: 'COMPLETED',
-              attemptCount: op.attemptCount + 1,
-              lastAttemptAt: Date.now(),
-              outcomeUncertain: false,
-              error: undefined,
-            }
-          : op
-      )
-    );
-
-    addAuditLog(
-      targetOp.accountId,
-      'OPERATION_RETRY_EXECUTED',
-      `Re-executed operation ${targetOp.operation} for ${targetOp.fileName || targetOp.fileId || 'item'}.`,
-      targetOp.fileId || undefined
-    );
+    void executeQueuedRemoteOperation(targetOp);
   };
 
   const clearCompletedOperations = () => {
@@ -1506,8 +1965,10 @@ export const FileManagerProvider: React.FC<{ children: ReactNode }> = ({ childre
         t.id === id
           ? {
               ...t,
-              bytesTransferred: t.totalBytes ?? 0,
-              status: { status: 'Completed' },
+              status: {
+                status: 'Failed',
+                error: 'Transfer source unavailable; re-initiate upload or download.',
+              },
             }
           : t
       )
@@ -1570,11 +2031,21 @@ export const FileManagerProvider: React.FC<{ children: ReactNode }> = ({ childre
       console.warn('Sample workspace seeding is disabled in production builds.');
       return;
     }
-    setAccounts(INITIAL_ACCOUNTS);
-    setFiles(INITIAL_FILES);
-    setCapabilities(INITIAL_CAPABILITIES);
-    setQuotas(INITIAL_QUOTA);
-    void databaseService.seedWorkspaceIfEmpty(INITIAL_ACCOUNTS, INITIAL_FILES, INITIAL_QUOTA);
+    void import('../data/mockData').then((mod) => {
+      setAccounts(mod.INITIAL_ACCOUNTS);
+      setFiles(mod.INITIAL_FILES);
+      setCapabilities(mod.INITIAL_CAPABILITIES);
+      setQuotas(mod.INITIAL_QUOTA);
+      safePersistFirestore(
+        () =>
+          databaseService.seedWorkspaceIfEmpty(
+            mod.INITIAL_ACCOUNTS,
+            mod.INITIAL_FILES,
+            mod.INITIAL_QUOTA
+          ),
+        'seedWorkspaceIfEmpty'
+      );
+    });
   };
 
   const syncAccount = async (accountId: LocalAccountId) => {
@@ -1608,6 +2079,7 @@ export const FileManagerProvider: React.FC<{ children: ReactNode }> = ({ childre
 
       if (liveQuota) {
         setQuotas((prev) => ({ ...prev, [accountId]: liveQuota }));
+        safePersistFirestore(() => databaseService.saveQuota(liveQuota), 'saveQuota');
       }
 
       const accFilesCount =
@@ -1654,48 +2126,6 @@ export const FileManagerProvider: React.FC<{ children: ReactNode }> = ({ childre
 
   const syncAllAccounts = async () => {
     await Promise.all(accounts.map((acc) => syncAccount(acc.localId)));
-  };
-
-  const simulateProviderIssue = (
-    accountId: LocalAccountId,
-    issueType: 'none' | 'error' | 'warning'
-  ) => {
-    const isDev = Boolean(
-      (import.meta as unknown as { env?: { DEV?: boolean } }).env?.DEV
-    );
-    if (!isDev) return;
-
-    setSyncStatuses((prev) => {
-      if (!prev[accountId]) return prev;
-      if (issueType === 'none') {
-        return {
-          ...prev,
-          [accountId]: {
-            ...prev[accountId],
-            status: 'synced',
-            errorMessage: undefined,
-          },
-        };
-      }
-      if (issueType === 'warning') {
-        return {
-          ...prev,
-          [accountId]: {
-            ...prev[accountId],
-            status: 'warning',
-            errorMessage: '[DEBUG] Rate limit ceiling approached (429 Backoff Active)',
-          },
-        };
-      }
-      return {
-        ...prev,
-        [accountId]: {
-          ...prev[accountId],
-          status: 'error',
-          errorMessage: '[DEBUG] OAuth token refresh expired or remote endpoint unreachable',
-        },
-      };
-    });
   };
 
   return (
@@ -1763,7 +2193,6 @@ export const FileManagerProvider: React.FC<{ children: ReactNode }> = ({ childre
         syncStatuses,
         syncAccount,
         syncAllAccounts,
-        simulateProviderIssue,
         auditLogs,
         addAuditLog,
         clearAuditLogs,

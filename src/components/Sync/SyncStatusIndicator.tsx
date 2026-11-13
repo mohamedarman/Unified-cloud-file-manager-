@@ -17,8 +17,8 @@ export const SyncStatusIndicator: React.FC = () => {
     accounts,
     syncStatuses,
     syncAccount,
+    reconnectAccount,
     syncAllAccounts,
-    simulateProviderIssue,
   } = useFileManager();
 
   const [isOpen, setIsOpen] = useState(false);
@@ -155,9 +155,9 @@ export const SyncStatusIndicator: React.FC = () => {
                 provider: acc.provider,
                 accountId: acc.localId,
                 status: 'synced',
-                lastSyncedAt: Date.now(),
-                latencyMs: 35,
-                itemsSynced: 10,
+                lastSyncedAt: 0,
+                latencyMs: 0,
+                itemsSynced: 0,
                 autoSyncIntervalMinutes: 5,
               };
 
@@ -247,7 +247,7 @@ export const SyncStatusIndicator: React.FC = () => {
 
                     {/* Clean unboxed telemetry */}
                     <div className="flex items-center gap-1.5 text-slate-400 dark:text-slate-500 font-mono text-[10px] tabular-nums">
-                      <span>{sync.latencyMs}ms</span>
+                      <span>{sync.latencyMs > 0 ? `${sync.latencyMs}ms` : '—'}</span>
                       <span aria-hidden="true">·</span>
                       <span className="text-slate-600 dark:text-slate-300">
                         {getRelativeTime(sync.lastSyncedAt)}
@@ -268,8 +268,7 @@ export const SyncStatusIndicator: React.FC = () => {
                       </p>
                       <button
                         onClick={() => {
-                          simulateProviderIssue(acc.localId, 'none');
-                          syncAccount(acc.localId);
+                          reconnectAccount(acc.localId);
                         }}
                         className="px-2.5 py-1 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-[10px] font-semibold transition"
                       >
@@ -287,12 +286,11 @@ export const SyncStatusIndicator: React.FC = () => {
                       </p>
                       <button
                         onClick={() => {
-                          simulateProviderIssue(acc.localId, 'none');
-                          syncAccount(acc.localId);
+                          void syncAccount(acc.localId);
                         }}
                         className="text-[10px] text-amber-900 dark:text-amber-200 font-semibold underline"
                       >
-                        Reset throttling ceiling
+                        Retry sync now
                       </button>
                     </div>
                   )}
@@ -301,30 +299,12 @@ export const SyncStatusIndicator: React.FC = () => {
             })}
           </div>
 
-          {/* Footer Diagnostic Tools */}
+          {/* Footer Cadence Note */}
           <div className="p-3 bg-slate-50 dark:bg-slate-850 border-t border-slate-100 dark:border-slate-800 text-slate-500 dark:text-slate-400 text-xs flex items-center justify-between">
             <span className="flex items-center gap-1.5 text-[11px]">
               <Clock className="w-3.5 h-3.5 text-slate-400" />
               <span>Cadence: every 5 min</span>
             </span>
-
-            {import.meta.env.DEV && (
-              <button
-                onClick={() => {
-                  const target = accounts[0]?.localId;
-                  if (target) {
-                    const current = syncStatuses[target]?.status;
-                    simulateProviderIssue(
-                      target,
-                      current === 'error' ? 'none' : 'error'
-                    );
-                  }
-                }}
-                className="text-[11px] text-blue-600 dark:text-blue-400 hover:underline transition font-medium"
-              >
-                Test Diagnostics (Dev)
-              </button>
-            )}
           </div>
         </div>
       )}

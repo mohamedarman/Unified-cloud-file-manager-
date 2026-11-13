@@ -90,6 +90,9 @@ jobs:
       - name: Scan for secrets
         run: ./gradlew :scanApkSecrets
 
+      - name: Verify source encoding
+        run: ./gradlew :verifySourceEncoding
+
       - name: Verify Gradle wrapper is checksum-pinned
         run: |
           if ! grep -q '^distributionSha256Sum=' gradle/wrapper/gradle-wrapper.properties; then
@@ -117,7 +120,7 @@ jobs:
 
       - name: Install dependencies and build web assets
         run: |
-          if [ -f package-lock.json ]; then npm ci || npm install; else npm install; fi
+          npm ci
           npm run lint
           npm test -- --run
           npm run build
@@ -212,7 +215,7 @@ jobs:
 
       - name: Prepare web assets
         run: |
-          if [ -f package-lock.json ]; then npm ci || npm install; else npm install; fi
+          npm ci
           npm run build
           rm -rf app/src/main/assets
           mkdir -p app/src/main/assets
@@ -369,7 +372,7 @@ jobs:
 
       - name: Prepare web assets
         run: |
-          if [ -f package-lock.json ]; then npm ci || npm install; else npm install; fi
+          npm ci
           npm run build
           rm -rf app/src/main/assets
           mkdir -p app/src/main/assets

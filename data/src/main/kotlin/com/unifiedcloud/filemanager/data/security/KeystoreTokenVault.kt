@@ -60,7 +60,7 @@ class KeystoreTokenVault(
             ciphertext = ciphertext,
             iv = cipher.iv,
             expiresAt = payload.expiresAtEpochMillis,
-            updatedAt = updatedAtMillis,
+            createdAt = updatedAtMillis,
         )
     }
 

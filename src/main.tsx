@@ -3,7 +3,6 @@ import ReactDOM from 'react-dom/client';
 import { AppContent } from './App';
 import { AuthProvider } from './context/AuthContext';
 import { FileManagerProvider } from './context/FileManagerContext';
-import { InfrastructureProvider } from './context/InfrastructureContext';
 import { ThemeProvider } from './context/ThemeContext';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
 import './index.css';
@@ -14,9 +13,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
       <ThemeProvider>
         <AuthProvider>
           <FileManagerProvider>
-            <InfrastructureProvider>
-              <AppContent />
-            </InfrastructureProvider>
+            <AppContent />
           </FileManagerProvider>
         </AuthProvider>
       </ThemeProvider>

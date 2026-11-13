@@ -93,10 +93,18 @@ function getActiveFirestoreUid(logIfMissing = false, subPath = 'users/<unauthent
   const uid = auth.currentUser?.uid ?? null;
   if (!uid && logIfMissing) {
     handleFirestoreError(
-      new Error('Firestore write skipped: no active Firebase Auth uid.'),
+      new Error('Firestore operation rejected: no active Firebase Auth uid.'),
       OperationType.WRITE,
       subPath
     );
+  }
+  return uid;
+}
+
+function requireActiveFirestoreUid(subPath: string): string {
+  const uid = getActiveFirestoreUid(true, subPath);
+  if (!uid) {
+    throw new Error(`Firestore write rejected for ${subPath}: user is not authenticated with Firebase.`);
   }
   return uid;
 }
@@ -119,8 +127,7 @@ export const databaseService = {
   },
 
   async syncUserProfile(user: AuthUser): Promise<void> {
-    const uid = getActiveFirestoreUid(true, 'users/<unauthenticated>');
-    if (!uid) return;
+    const uid = requireActiveFirestoreUid('users/<unauthenticated>');
     const path = `users/${uid}`;
     try {
       await setDoc(
@@ -138,6 +145,7 @@ export const databaseService = {
       );
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, path);
+      throw error;
     }
   },
 
@@ -212,8 +220,7 @@ export const databaseService = {
   },
 
   async saveAccount(account: AccountRef, quota?: QuotaUsage): Promise<void> {
-    const uid = getActiveFirestoreUid();
-    if (!uid) return;
+    const uid = requireActiveFirestoreUid(`users/<unauthenticated>/accounts/${account.localId}`);
     const accountPath = `users/${uid}/accounts/${account.localId}`;
     try {
       await setDoc(
@@ -228,48 +235,48 @@ export const databaseService = {
       }
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, accountPath);
+      throw error;
     }
   },
 
   async removeAccount(accountId: number): Promise<void> {
-    const uid = getActiveFirestoreUid();
-    if (!uid) return;
+    const uid = requireActiveFirestoreUid(`users/<unauthenticated>/accounts/${accountId}`);
     const accountPath = `users/${uid}/accounts/${accountId}`;
     try {
       await deleteDoc(doc(db, 'users', uid, 'accounts', String(accountId)));
       await deleteDoc(doc(db, 'users', uid, 'quotas', String(accountId)));
     } catch (error) {
       handleFirestoreError(error, OperationType.DELETE, accountPath);
+      throw error;
     }
   },
 
   async saveFile(file: CloudFile): Promise<void> {
-    const uid = getActiveFirestoreUid();
-    if (!uid) return;
     const docId = encodeDocId(cacheKey(file.ref));
+    const uid = requireActiveFirestoreUid(`users/<unauthenticated>/files/${docId}`);
     const path = `users/${uid}/files/${docId}`;
     try {
       await setDoc(doc(db, 'users', uid, 'files', docId), sanitizeForFirestore(file));
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, path);
+      throw error;
     }
   },
 
   async removeFile(file: CloudFile): Promise<void> {
-    const uid = getActiveFirestoreUid();
-    if (!uid) return;
     const docId = encodeDocId(cacheKey(file.ref));
+    const uid = requireActiveFirestoreUid(`users/<unauthenticated>/files/${docId}`);
     const path = `users/${uid}/files/${docId}`;
     try {
       await deleteDoc(doc(db, 'users', uid, 'files', docId));
     } catch (error) {
       handleFirestoreError(error, OperationType.DELETE, path);
+      throw error;
     }
   },
 
   async saveQuota(quota: QuotaUsage): Promise<void> {
-    const uid = getActiveFirestoreUid();
-    if (!uid) return;
+    const uid = requireActiveFirestoreUid(`users/<unauthenticated>/quotas/${quota.accountId}`);
     const path = `users/${uid}/quotas/${quota.accountId}`;
     try {
       await setDoc(
@@ -278,28 +285,36 @@ export const databaseService = {
       );
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, path);
+      throw error;
     }
   },
 
   async saveOperation(op: PendingOperation): Promise<void> {
-    const uid = getActiveFirestoreUid();
-    if (!uid) return;
+    const uid = requireActiveFirestoreUid(`users/<unauthenticated>/operations/${op.id}`);
     const path = `users/${uid}/operations/${op.id}`;
     try {
-      await setDoc(doc(db, 'users', uid, 'operations', String(op.id)), sanitizeForFirestore(op));
+      const normalized: PendingOperation = {
+        ...op,
+        fileId: op.fileId ?? '',
+      };
+      await setDoc(
+        doc(db, 'users', uid, 'operations', String(op.id)),
+        sanitizeForFirestore(normalized)
+      );
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, path);
+      throw error;
     }
   },
 
   async saveAuditLog(entry: AuditLogEntry): Promise<void> {
-    const uid = getActiveFirestoreUid();
-    if (!uid) return;
+    const uid = requireActiveFirestoreUid(`users/<unauthenticated>/auditLogs/${entry.id}`);
     const path = `users/${uid}/auditLogs/${entry.id}`;
     try {
       await setDoc(doc(db, 'users', uid, 'auditLogs', entry.id), sanitizeForFirestore(entry));
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, path);
+      throw error;
     }
   },
 
@@ -308,8 +323,7 @@ export const databaseService = {
     files: CloudFile[],
     quotas: Record<number, QuotaUsage>
   ): Promise<void> {
-    const uid = getActiveFirestoreUid();
-    if (!uid) return;
+    const uid = requireActiveFirestoreUid('users/<unauthenticated>/seedWorkspace');
     try {
       const existingAccounts = await getDocs(collection(db, 'users', uid, 'accounts'));
       if (!existingAccounts.empty) return;
@@ -334,6 +348,7 @@ export const databaseService = {
       await batch.commit();
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, `users/${uid}`);
+      throw error;
     }
   },
 };

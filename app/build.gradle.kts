@@ -91,45 +91,41 @@ abstract class BuildFrontendTask : DefaultTask() {
     @get:Internal
     abstract val projectRoot: DirectoryProperty
 
+    @get:InputDirectory
+    @get:PathSensitive(PathSensitivity.RELATIVE)
+    abstract val webSrcDir: DirectoryProperty
+
+    @get:InputDirectory
+    @get:Optional
+    @get:PathSensitive(PathSensitivity.RELATIVE)
+    abstract val webPublicDir: DirectoryProperty
+
+    @get:InputFiles
+    @get:PathSensitive(PathSensitivity.RELATIVE)
+    abstract val webConfigFiles: ConfigurableFileCollection
+
     @get:OutputDirectory
     abstract val outputDir: DirectoryProperty
 
     @TaskAction
     fun build() {
         val rootDir = projectRoot.get().asFile
-        val distIndex = File(outputDir.get().asFile, "index.html")
-        if (distIndex.exists()) {
-            return
-        }
-
         val isWindows = System.getProperty("os.name").lowercase().contains("windows")
         val nodeModules = File(rootDir, "node_modules")
         val lockFile = File(rootDir, "package-lock.json")
 
         if (!nodeModules.exists()) {
-            val ciResult =
-                execOperations.exec {
-                    workingDir = rootDir
-                    isIgnoreExitValue = true
-                    if (isWindows) {
-                        if (lockFile.exists()) {
-                            commandLine("cmd", "/c", "npm ci")
-                        } else {
-                            commandLine("cmd", "/c", "npm install")
-                        }
+            execOperations.exec {
+                workingDir = rootDir
+                if (isWindows) {
+                    if (lockFile.exists()) {
+                        commandLine("cmd", "/c", "npm ci")
                     } else {
-                        if (lockFile.exists()) {
-                            commandLine("npm", "ci")
-                        } else {
-                            commandLine("npm", "install")
-                        }
-                    }
-                }
-            if (ciResult.exitValue != 0) {
-                execOperations.exec {
-                    workingDir = rootDir
-                    if (isWindows) {
                         commandLine("cmd", "/c", "npm install")
+                    }
+                } else {
+                    if (lockFile.exists()) {
+                        commandLine("npm", "ci")
                     } else {
                         commandLine("npm", "install")
                     }
@@ -171,6 +167,18 @@ abstract class CopyFrontendAssetsTask : DefaultTask() {
 val buildFrontend =
     tasks.register<BuildFrontendTask>("buildFrontend") {
         projectRoot.set(layout.projectDirectory.dir(".."))
+        webSrcDir.set(layout.projectDirectory.dir("../src"))
+        val publicDir = layout.projectDirectory.dir("../public")
+        if (publicDir.asFile.exists()) {
+            webPublicDir.set(publicDir)
+        }
+        webConfigFiles.from(
+            layout.projectDirectory.file("../index.html"),
+            layout.projectDirectory.file("../package.json"),
+            layout.projectDirectory.file("../package-lock.json"),
+            layout.projectDirectory.file("../vite.config.ts"),
+            layout.projectDirectory.file("../tsconfig.json"),
+        )
         outputDir.set(layout.projectDirectory.dir("../dist"))
     }
 
@@ -194,6 +202,9 @@ dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)
     implementation(libs.androidx.webkit)
+    implementation(libs.androidx.browser)
+    implementation(libs.androidx.credentials)
+    implementation(libs.androidx.credentials.play.services)
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.lifecycle.runtime)
     implementation(libs.androidx.lifecycle.viewmodel.compose)

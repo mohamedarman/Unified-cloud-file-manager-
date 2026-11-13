@@ -51,7 +51,7 @@ export const LegalComplianceView: React.FC = () => {
   };
 
   const handleExportPolicy = () => {
-    const text = `UNIFIED CLOUD FILE MANAGER - PRIVACY POLICY & TERMS OF SERVICE\nLast Updated: October 8, 2026\n\nPrivacy Policy and Terms can be viewed online at https://unified-cloud-file-manager.app/#/legal\nContact: privacy@unified-cloud-file-manager.app`;
+    const text = `UNIFIED CLOUD FILE MANAGER - PRIVACY POLICY & TERMS OF SERVICE\nLast Updated: October 8, 2026\n\nProject Repository: https://github.com/mohamedarman/Unified-cloud-file-manager\nArchitecture: Client-side direct-to-provider OAuth with Firebase Auth & per-user Firestore metadata sync.`;
     const blob = new Blob([text], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -168,7 +168,7 @@ export const LegalComplianceView: React.FC = () => {
                 1. Overview & Data Minimization
               </h4>
               <p>
-                Unified Cloud File Manager is committed to zero-knowledge privacy. The application is designed to operate primarily on the client device. We do not maintain centralized user databases of your uploaded files, passwords, or document contents.
+                Unified Cloud File Manager is designed with strict client-side data minimization. Workspace sign-in uses Firebase Authentication and optional per-user Firestore metadata sync, while cloud file contents and OAuth access tokens communicate directly between your device and your chosen storage providers.
               </p>
             </section>
 
@@ -261,14 +261,21 @@ export const LegalComplianceView: React.FC = () => {
 
             <section className="space-y-2 border-t border-slate-100 dark:border-slate-800 pt-4">
               <h4 className="font-bold text-slate-900 dark:text-white text-sm">
-                6. Contact & Data Protection Officer
+                6. Project Maintainer & Issue Reporting
               </h4>
               <p>
-                For questions regarding this Privacy Policy or data protection practices, please contact us at:
+                For questions regarding this Privacy Policy or security disclosures, open an issue or security report via the project repository:
               </p>
               <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 font-mono text-[11px] text-slate-700 dark:text-slate-300">
-                Email: privacy@unified-cloud-file-manager.app<br />
-                Security Inquiries: security@unified-cloud-file-manager.app
+                Repository:{' '}
+                <a
+                  href="https://github.com/mohamedarman/Unified-cloud-file-manager"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-600 dark:text-blue-400 underline"
+                >
+                  https://github.com/mohamedarman/Unified-cloud-file-manager
+                </a>
               </div>
             </section>
           </div>

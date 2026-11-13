@@ -30,6 +30,7 @@ export const SettingsView: React.FC = () => {
     sortBy,
     setSortBy,
     resetAllData,
+    evictOfflineCache,
     setCurrentTab,
     isMobilePreview,
     setIsMobilePreview,
@@ -37,19 +38,42 @@ export const SettingsView: React.FC = () => {
 
   const { themeMode, setThemeMode, resolvedTheme } = useTheme();
 
-  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
-  const [offlineSyncWifiOnly, setOfflineSyncWifiOnly] = useState(true);
+  const [notificationsEnabled, setNotificationsEnabled] = useState(() => {
+    try {
+      const stored = localStorage.getItem('ucfm_notifications_enabled');
+      return stored === null ? true : stored === 'true';
+    } catch {
+      return true;
+    }
+  });
+  const [offlineSyncWifiOnly, setOfflineSyncWifiOnly] = useState(() => {
+    try {
+      const stored = localStorage.getItem('ucfm_wifi_only_sync');
+      return stored === null ? true : stored === 'true';
+    } catch {
+      return true;
+    }
+  });
   const [cacheCleared, setCacheCleared] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
 
-  const handleClearCache = () => {
+  const handleClearCache = async () => {
+    await evictOfflineCache();
     setCacheCleared(true);
+    toast.success('Offline file byte cache cleared.');
     setTimeout(() => setCacheCleared(false), 2500);
   };
 
   const handleSavePreferences = (e: React.FormEvent) => {
     e.preventDefault();
+    try {
+      localStorage.setItem('ucfm_notifications_enabled', String(notificationsEnabled));
+      localStorage.setItem('ucfm_wifi_only_sync', String(offlineSyncWifiOnly));
+    } catch {
+      // Ignore storage quota errors
+    }
     setSaveSuccess(true);
+    toast.success('Preferences saved.');
     setTimeout(() => setSaveSuccess(false), 2000);
   };
 
@@ -280,10 +304,10 @@ export const SettingsView: React.FC = () => {
               <label className="flex items-center justify-between p-2 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer transition">
                 <div>
                   <span className="font-semibold text-slate-800 dark:text-slate-200 block">
-                    Mobile Viewport Frame (Simulator)
+                    Compact Mobile Viewport Frame
                   </span>
                   <span className="text-slate-400 text-[11px]">
-                    Render phone frame for ergonomic mobile testing on desktop displays
+                    Constrain desktop canvas to mobile width for responsive inspection
                   </span>
                 </div>
                 <input
@@ -377,14 +401,14 @@ export const SettingsView: React.FC = () => {
                 Factory Reset All Local Data
               </span>
               <span className="text-slate-400 text-[11px]">
-                Disconnects all accounts, clears operations history, and re-initializes mock storage
+                Disconnects all accounts, clears operations history, and resets all locally cached metadata, offline bytes, and connected account sessions
               </span>
             </div>
 
             <button
               onClick={() => {
                 resetAllData();
-                toast.success('App mock cloud accounts and cached data have been reset to defaults.');
+                toast.success('Local workspace data cleared.');
               }}
               className="px-3 py-1.5 rounded-lg bg-rose-50 dark:bg-rose-950/50 hover:bg-rose-100 dark:hover:bg-rose-900/50 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800 font-medium transition text-xs shrink-0 cursor-pointer"
             >
@@ -423,7 +447,7 @@ export const SettingsView: React.FC = () => {
                 <span className="text-slate-400">→</span>
               </div>
               <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
-                Read our zero-knowledge data minimization and Google API Limited Use commitments.
+                Read our client-side data minimization and Google API Limited Use commitments.
               </p>
             </button>
 

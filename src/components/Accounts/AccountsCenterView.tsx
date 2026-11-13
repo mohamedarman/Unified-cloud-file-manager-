@@ -34,10 +34,17 @@ export const AccountsCenterView: React.FC<AccountsCenterViewProps> = ({
     syncStatuses,
     syncAccount,
     syncAllAccounts,
-    simulateProviderIssue,
   } = useFileManager();
 
   const [isSyncingAll, setIsSyncingAll] = useState(false);
+
+  const validLatencies = accounts
+    .map((acc) => syncStatuses[acc.localId]?.latencyMs ?? 0)
+    .filter((ms) => ms > 0);
+  const avgLatencyMs =
+    validLatencies.length > 0
+      ? Math.round(validLatencies.reduce((sum, ms) => sum + ms, 0) / validLatencies.length)
+      : 0;
 
   const handleTestConnection = async (accId: number, name: string) => {
     reconnectAccount(accId);
@@ -125,7 +132,9 @@ export const AccountsCenterView: React.FC<AccountsCenterViewProps> = ({
           </div>
           <div className="px-3 py-1.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
             <span className="text-[10px] text-slate-400 dark:text-slate-500 block uppercase">Avg Latency</span>
-            <span className="font-bold text-emerald-600 dark:text-emerald-400">~38ms</span>
+            <span className="font-bold text-emerald-600 dark:text-emerald-400">
+              {avgLatencyMs > 0 ? `${avgLatencyMs}ms` : '—'}
+            </span>
           </div>
         </div>
       </div>
@@ -139,9 +148,9 @@ export const AccountsCenterView: React.FC<AccountsCenterViewProps> = ({
             provider: acc.provider,
             accountId: acc.localId,
             status: 'synced',
-            lastSyncedAt: Date.now() - 120_000,
-            latencyMs: 38,
-            itemsSynced: 25,
+            lastSyncedAt: 0,
+            latencyMs: 0,
+            itemsSynced: 0,
             autoSyncIntervalMinutes: 5,
           };
 
@@ -265,7 +274,7 @@ export const AccountsCenterView: React.FC<AccountsCenterViewProps> = ({
                   <div>
                     <span className="text-slate-400 dark:text-slate-500 block text-[10px]">Latency</span>
                     <span className="font-semibold text-emerald-600 dark:text-emerald-400 font-mono tabular-nums">
-                      {sync.latencyMs}ms
+                      {sync.latencyMs > 0 ? `${sync.latencyMs}ms` : '—'}
                     </span>
                   </div>
                 </div>
@@ -279,8 +288,7 @@ export const AccountsCenterView: React.FC<AccountsCenterViewProps> = ({
                     </p>
                     <button
                       onClick={() => {
-                        simulateProviderIssue(acc.localId, 'none');
-                        syncAccount(acc.localId);
+                        reconnectAccount(acc.localId);
                       }}
                       className="px-2.5 py-1 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-semibold shadow-xs transition"
                     >
@@ -297,12 +305,11 @@ export const AccountsCenterView: React.FC<AccountsCenterViewProps> = ({
                     </p>
                     <button
                       onClick={() => {
-                        simulateProviderIssue(acc.localId, 'none');
-                        syncAccount(acc.localId);
+                        void syncAccount(acc.localId);
                       }}
                       className="text-[11px] text-amber-900 dark:text-amber-200 font-semibold underline"
                     >
-                      Reset rate limit counter & re-verify
+                      Retry sync & re-verify
                     </button>
                   </div>
                 )}

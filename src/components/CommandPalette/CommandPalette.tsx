@@ -27,14 +27,10 @@ import {
   ExternalLink,
   Keyboard,
   X,
-  Layers,
-  Workflow,
 } from 'lucide-react';
 import { useFileManager } from '../../context/FileManagerContext';
-import { useInfrastructure } from '../../context/InfrastructureContext';
 import { useTheme } from '../../context/ThemeContext';
 import { CloudFile, PROVIDERS, ProviderId, cacheKey } from '../../types';
-import { CloudResource } from '../../types/infrastructure';
 import { humanReadableBytes, formatDate } from '../../utils/formatters';
 import { getFileTypeDetails } from '../FileBrowser/FileIcon';
 import { toast } from 'sonner';
@@ -78,7 +74,6 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
     navigateToFolder,
   } = useFileManager();
 
-  const { resources, setSelectedResource } = useInfrastructure();
   const { themeMode, setThemeMode, resolvedTheme } = useTheme();
   const [query, setQuery] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -152,96 +147,13 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
       {
         id: 'nav-dashboard',
         category: 'Navigation',
-        title: 'Command Center Dashboard',
-        subtitle: 'Executive overview, health SLA, and hyperscaler spend',
+        title: 'Multi-Cloud Dashboard',
+        subtitle: 'Multi-cloud storage overview, connected accounts, and quotas',
         icon: <Cloud className="w-4 h-4 text-blue-500" />,
         shortcut: 'G D',
         action: () => {
           onClose();
           setCurrentTab('dashboard');
-        },
-      },
-      {
-        id: 'nav-topology',
-        category: 'Navigation',
-        title: 'Multi-Cloud Topology Map',
-        subtitle: 'Interactive dependency graph across AWS, Azure, GCP',
-        icon: <Layers className="w-4 h-4 text-indigo-500" />,
-        shortcut: 'G T',
-        action: () => {
-          onClose();
-          setCurrentTab('infra_topology');
-        },
-      },
-      {
-        id: 'nav-infra',
-        category: 'Navigation',
-        title: 'Infrastructure Fleet Overview',
-        subtitle: 'Compute VMs, K8s, databases, and networks',
-        icon: <HardDrive className="w-4 h-4 text-emerald-500" />,
-        shortcut: 'G I',
-        action: () => {
-          onClose();
-          setCurrentTab('infra_overview');
-        },
-      },
-      {
-        id: 'nav-providers',
-        category: 'Navigation',
-        title: 'Cloud Providers & Tenants',
-        subtitle: 'AWS accounts, Azure subscriptions, GCP projects',
-        icon: <Cloud className="w-4 h-4 text-amber-500" />,
-        shortcut: 'G P',
-        action: () => {
-          onClose();
-          setCurrentTab('providers');
-        },
-      },
-      {
-        id: 'nav-metrics',
-        category: 'Navigation',
-        title: 'Live Metrics & Observability',
-        subtitle: 'P95 latency percentiles and network throughput',
-        icon: <Sparkles className="w-4 h-4 text-sky-500" />,
-        action: () => {
-          onClose();
-          setCurrentTab('monitoring_metrics');
-        },
-      },
-      {
-        id: 'nav-logs',
-        category: 'Navigation',
-        title: 'Live Multi-Cloud Syslog',
-        subtitle: 'Streaming events, debug traces, and audit logs',
-        icon: <FileText className="w-4 h-4 text-slate-400" />,
-        shortcut: 'G L',
-        action: () => {
-          onClose();
-          setCurrentTab('monitoring_logs');
-        },
-      },
-      {
-        id: 'nav-cost',
-        category: 'Navigation',
-        title: 'FinOps Cost Governance',
-        subtitle: 'Spend optimization and budget tracking',
-        icon: <Sparkles className="w-4 h-4 text-emerald-500" />,
-        shortcut: 'G C',
-        action: () => {
-          onClose();
-          setCurrentTab('cost_overview');
-        },
-      },
-      {
-        id: 'nav-automation',
-        category: 'Navigation',
-        title: 'Automation Runbooks',
-        subtitle: 'Cross-cloud replication and power schedulers',
-        icon: <Workflow className="w-4 h-4 text-purple-500" />,
-        shortcut: 'G R',
-        action: () => {
-          onClose();
-          setCurrentTab('automation_workflows');
         },
       },
       {

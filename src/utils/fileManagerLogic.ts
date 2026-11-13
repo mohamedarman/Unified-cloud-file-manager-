@@ -15,6 +15,14 @@ export function createEntityId(prefix: string): string {
   return `${prefix}_${generateUuid()}`;
 }
 
+export function createMonotonicIdAllocator(initialMaxId = 0): () => number {
+  let current = Math.max(0, Math.floor(initialMaxId));
+  return () => {
+    current += 1;
+    return current;
+  };
+}
+
 /**
  * Computes upload/download progress percentage safely.
  * Zero-byte files (`totalBytes === 0`) return 100% rather than NaN.

@@ -1,6 +1,7 @@
 package com.unifiedcloud.filemanager.cloud.provider
 
 import com.unifiedcloud.filemanager.cloud.google.quota.QuotaGovernor
+import com.unifiedcloud.filemanager.domain.model.ByteRange
 import com.unifiedcloud.filemanager.domain.model.FileQuery
 import com.unifiedcloud.filemanager.domain.model.LocalAccountId
 import com.unifiedcloud.filemanager.domain.model.ProviderFileId
@@ -154,12 +155,17 @@ class HttpCloudProviderTest {
         }
 
     @Test
-    fun `download streams bytes into ContentSource`() =
+    fun `download and downloadRange stream bytes and send Range header`() =
         runTest {
             server.enqueue(
                 MockResponse()
                     .setResponseCode(200)
                     .setBody("hello-cloud-bytes"),
+            )
+            server.enqueue(
+                MockResponse()
+                    .setResponseCode(206)
+                    .setBody("cloud"),
             )
 
             val destination =
@@ -170,5 +176,134 @@ class HttpCloudProviderTest {
             assertTrue(result.isSuccess)
             val content = result.getOrThrow().use { it.openStream().readBytes().decodeToString() }
             assertEquals("hello-cloud-bytes", content)
+            server.takeRequest()
+
+            val rangeResult = provider.downloadRange(account, ProviderFileId("file_1"), ByteRange(6L, 10L))
+            assertTrue(rangeResult.isSuccess)
+            val rangedBytes = rangeResult.getOrThrow().use { it.openStream().readBytes().decodeToString() }
+            assertEquals("cloud", rangedBytes)
+            val rangedReq = server.takeRequest()
+            assertEquals("bytes=6-10", rangedReq.getHeader("Range"))
+        }
+
+    @Test
+    fun `onedrive provider lists children and parses quota`() =
+        runTest {
+            val oneDrive =
+                HttpCloudProvider(
+                    providerId = ProviderId.ONE_DRIVE,
+                    httpClient = OkHttpClient(),
+                    tokenProvider = { Result.success("od_token") },
+                    quotaGovernor = QuotaGovernor(),
+                    baseUrlOverride = server.url("/me/drive").toString(),
+                )
+            server.enqueue(
+                MockResponse()
+                    .setResponseCode(200)
+                    .setBody("""{"quota":{"used":1024,"total":20480}}"""),
+            )
+            server.enqueue(
+                MockResponse()
+                    .setResponseCode(200)
+                    .setBody("""{"value":[{"id":"od_1","name":"Notes.docx","size":512}]}"""),
+            )
+
+            val quota = oneDrive.getQuotaInfo(account).getOrThrow()
+            assertEquals(1_024L, quota.usedBytes)
+            assertEquals(20_480L, quota.limitBytes)
+
+            val files = oneDrive.listFiles(FileQuery(accountId = account, parentFolderId = null)).getOrThrow()
+            assertEquals(1, files.items.size)
+            assertEquals("Notes.docx", files.items.first().name)
+            assertTrue(server.takeRequest().path?.contains("/me/drive") == true)
+            assertTrue(server.takeRequest().path?.contains("/me/drive/root/children") == true)
+        }
+
+    @Test
+    fun `dropbox provider parses folder entries and rejects unsupported trash or star operations`() =
+        runTest {
+            val dropbox =
+                HttpCloudProvider(
+                    providerId = ProviderId.DROPBOX,
+                    httpClient = OkHttpClient(),
+                    tokenProvider = { Result.success("dbx_token") },
+                    quotaGovernor = QuotaGovernor(),
+                    baseUrlOverride = server.url("/2").toString(),
+                )
+            server.enqueue(
+                MockResponse()
+                    .setResponseCode(200)
+                    .setBody("""{"used":4096,"allocation":{"allocated":16384}}"""),
+            )
+            val dropboxBody =
+                """
+                {
+                  "entries": [
+                    {
+                      ".tag": "file",
+                      "id": "id:abc",
+                      "path_lower": "/spec.txt",
+                      "name": "spec.txt",
+                      "size": 128
+                    }
+                  ],
+                  "has_more": false
+                }
+                """.trimIndent()
+            server.enqueue(
+                MockResponse()
+                    .setResponseCode(200)
+                    .setBody(dropboxBody),
+            )
+
+            val quota = dropbox.getQuotaInfo(account).getOrThrow()
+            assertEquals(4_096L, quota.usedBytes)
+            assertEquals(16_384L, quota.limitBytes)
+
+            val page = dropbox.listFiles(FileQuery(accountId = account, parentFolderId = null)).getOrThrow()
+            assertEquals(1, page.items.size)
+            assertEquals("/spec.txt", page.items.first().ref.fileId.value)
+
+            assertTrue(dropbox.trash(account, ProviderFileId("/spec.txt")).isFailure)
+            assertTrue(dropbox.setStarred(account, ProviderFileId("/spec.txt"), true).isFailure)
+        }
+
+    @Test
+    fun `box provider lists items and uploads multipart file`() =
+        runTest {
+            val box =
+                HttpCloudProvider(
+                    providerId = ProviderId.BOX,
+                    httpClient = OkHttpClient(),
+                    tokenProvider = { Result.success("box_token") },
+                    quotaGovernor = QuotaGovernor(),
+                    baseUrlOverride = server.url("/2.0").toString(),
+                )
+            server.enqueue(
+                MockResponse()
+                    .setResponseCode(200)
+                    .setBody("""{"space_used":256,"space_amount":8192}"""),
+            )
+            server.enqueue(
+                MockResponse()
+                    .setResponseCode(200)
+                    .setBody("""{"id":"box_99","name":"hello.txt","type":"file","size":5}"""),
+            )
+
+            val quota = box.getQuotaInfo(account).getOrThrow()
+            assertEquals(256L, quota.usedBytes)
+            assertEquals(8_192L, quota.limitBytes)
+
+            val uploaded =
+                box.upload(
+                    accountId = account,
+                    source = ByteArrayInputStream("hello".encodeToByteArray()),
+                    parentFolderId = null,
+                    name = "hello.txt",
+                    mimeType = "text/plain",
+                    sizeBytes = 5L,
+                ).getOrThrow()
+            assertEquals("box_99", uploaded.ref.fileId.value)
+            assertEquals("hello.txt", uploaded.name)
         }
 }

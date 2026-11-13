@@ -216,17 +216,17 @@ export const MobileMoreDrawer: React.FC<MobileMoreDrawerProps> = ({
 
         {/* Reset / Clear Data */}
         <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
-          <span>Sandbox Reset</span>
+          <span>Local Workspace</span>
           <button
             onClick={() => {
               resetAllData();
-              toast.success('Application demo data reset to default');
+              toast.success('Local workspace data cleared.');
               onClose();
             }}
             className="text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 flex items-center gap-1 font-medium cursor-pointer"
           >
             <RotateCcw className="w-3.5 h-3.5" />
-            <span>Reset Demo Data</span>
+            <span>Reset Local Data</span>
           </button>
         </div>
       </div>

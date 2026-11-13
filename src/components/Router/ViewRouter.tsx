@@ -3,12 +3,6 @@ import { NavigationTab } from '../../context/FileManagerContext';
 import { ErrorBoundary } from '../common/ErrorBoundary';
 import { CloudFile } from '../../types';
 import { MultiCloudDashboardView } from '../Dashboard/MultiCloudDashboardView';
-import { InfrastructureOverviewView } from '../Infrastructure/InfrastructureOverviewView';
-import { TopologyView } from '../Infrastructure/TopologyView';
-import { CloudProvidersView } from '../Providers/CloudProvidersView';
-import { ObservabilityView } from '../Observability/ObservabilityView';
-import { CostManagementView } from '../Cost/CostManagementView';
-import { AutomationView } from '../Automation/AutomationView';
 import { FileBrowser } from '../FileBrowser/FileBrowser';
 import { GalleryView } from '../Gallery/GalleryView';
 import { CrossAccountSearchView } from '../Search/CrossAccountSearchView';
@@ -81,27 +75,6 @@ export const ViewRouter: React.FC<ViewRouterProps> = ({
             onOpenDetails={onOpenDetails}
           />
         );
-      case 'infra_overview':
-      case 'infra_compute':
-      case 'infra_storage':
-      case 'infra_databases':
-      case 'infra_networks':
-      case 'infra_k8s':
-        return <InfrastructureOverviewView />;
-      case 'infra_topology':
-        return <TopologyView />;
-      case 'providers':
-        return <CloudProvidersView />;
-      case 'monitoring_metrics':
-      case 'monitoring_logs':
-      case 'monitoring_alerts':
-      case 'monitoring_events':
-        return <ObservabilityView />;
-      case 'cost_overview':
-      case 'cost_optimization':
-        return <CostManagementView />;
-      case 'automation_workflows':
-        return <AutomationView />;
       case 'settings':
         return <SettingsView />;
       case 'legal':

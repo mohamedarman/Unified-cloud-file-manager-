@@ -32,7 +32,7 @@ jobs:
 
       - name: Install dependencies and build web assets
         run: |
-          if [ -f package-lock.json ]; then npm ci || npm install; else npm install; fi
+          npm ci
           npm run lint
           npm test -- --run
           npm run build
@@ -80,12 +80,27 @@ jobs:
       - name: Make gradlew executable
         run: chmod +x ./gradlew
 
+      - name: Run Policy and Schema Gates
+        run: ./gradlew :verifyDomainPurity :scanProhibitedPhrasing :scanApkSecrets :verifySourceEncoding :data:kspDebugKotlin
+
+      - name: Run Unit Tests and Static Analysis
+        run: ./gradlew :domain:test testDebugUnitTest lintDebug detekt ktlintCheck
+
       - name: Build Debug APK
-        run: ./gradlew :app:assembleDebug
+        env:
+          ORG_GRADLE_PROJECT_GOOGLE_OAUTH_CLIENT_ID: ${{ secrets.GOOGLE_OAUTH_CLIENT_ID }}
+          ORG_GRADLE_PROJECT_ONEDRIVE_CLIENT_ID: ${{ secrets.ONEDRIVE_CLIENT_ID }}
+          ORG_GRADLE_PROJECT_DROPBOX_CLIENT_ID: ${{ secrets.DROPBOX_CLIENT_ID }}
+          ORG_GRADLE_PROJECT_BOX_CLIENT_ID: ${{ secrets.BOX_CLIENT_ID }}
+        run: |
+          ./gradlew :app:assembleDebug
+          test -s app/build/outputs/apk/debug/app-debug.apk
 
       - name: Upload Debug APK Artifact
+        if: success()
         uses: actions/upload-artifact@v4.6.0
         with:
           name: unified-cloud-file-manager-fixed-apk
           path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
           retention-days: 14

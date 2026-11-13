@@ -30,6 +30,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.ActivityResult
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.browser.customtabs.CustomTabsIntent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -62,6 +63,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.webkit.WebViewAssetLoader
+import org.json.JSONObject
 
 class MainActivity : ComponentActivity() {
     private var fileUploadCallback: ValueCallback<Array<Uri>>? = null
@@ -162,7 +164,11 @@ class MainActivity : ComponentActivity() {
         val clipData = result.data?.clipData
         val uris =
             if (result.resultCode == RESULT_OK && clipData != null && clipData.itemCount > 0) {
-                Array(clipData.itemCount) { index -> clipData.getItemAt(index).uri }
+                val collected =
+                    (0 until clipData.itemCount)
+                        .mapNotNull { index -> clipData.getItemAt(index)?.uri }
+                        .toTypedArray()
+                collected.takeIf { it.isNotEmpty() }
             } else {
                 WebChromeClient.FileChooserParams.parseResult(result.resultCode, result.data)
             }
@@ -308,7 +314,7 @@ private fun createWebView(
         }
         addJavascriptInterface(nativeBridge, NativeCloudBridge.JS_INTERFACE_NAME)
         setDownloadListener { url, userAgent, contentDisposition, mimeType, _ ->
-            handleWebViewDownload(context, url, userAgent, contentDisposition, mimeType)
+            handleWebViewDownload(this, context, url, userAgent, contentDisposition, mimeType)
         }
         webChromeClient = createWebChromeClient(callbacks.onLaunchFileChooser)
         webViewClient = createWebViewClient(context, assetLoader, callbacks)
@@ -316,6 +322,7 @@ private fun createWebView(
 }
 
 private fun handleWebViewDownload(
+    webView: WebView,
     context: Context,
     url: String?,
     userAgent: String?,
@@ -323,12 +330,41 @@ private fun handleWebViewDownload(
     mimeType: String?,
 ) {
     val parsed = url?.let { runCatching { Uri.parse(it) }.getOrNull() } ?: return
+    val fileName = URLUtil.guessFileName(url, contentDisposition, mimeType)
+    val resolvedMime = mimeType ?: "application/octet-stream"
+    if (parsed.scheme == "blob" || parsed.scheme == "data") {
+        val quotedUrl = JSONObject.quote(url)
+        val quotedName = JSONObject.quote(fileName)
+        val quotedMime = JSONObject.quote(resolvedMime)
+        val script =
+            """
+            (function() {
+              fetch($quotedUrl)
+                .then(function(r) { return r.blob(); })
+                .then(function(b) {
+                  var reader = new FileReader();
+                  reader.onloadend = function() {
+                    var bridge = window.UnifiedCloudBridge;
+                    if (bridge && reader.result) {
+                      bridge.saveDownloadedFileBase64(
+                        $quotedName,
+                        $quotedMime,
+                        String(reader.result)
+                      );
+                    }
+                  };
+                  reader.readAsDataURL(b);
+                });
+            })();
+            """.trimIndent()
+        webView.evaluateJavascript(script, null)
+        return
+    }
     if (parsed.scheme != "https") return
     runCatching {
-        val fileName = URLUtil.guessFileName(url, contentDisposition, mimeType)
         val request =
             DownloadManager.Request(parsed).apply {
-                setMimeType(mimeType)
+                setMimeType(resolvedMime)
                 if (!userAgent.isNullOrBlank()) {
                     addRequestHeader("User-Agent", userAgent)
                 }
@@ -382,12 +418,21 @@ private fun createWebViewClient(
         val url = request?.url ?: return true
         val isLocalAsset = url.scheme == "https" && url.host == ASSET_DOMAIN
         if (!isLocalAsset && (url.scheme == "https" || url.scheme == "http")) {
-            runCatching {
-                val intent =
-                    Intent(Intent.ACTION_VIEW, url).apply {
-                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                    }
-                context.startActivity(intent)
+            val openedCustomTab =
+                runCatching {
+                    val tabsIntent = CustomTabsIntent.Builder().setShowTitle(true).build()
+                    tabsIntent.intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    tabsIntent.launchUrl(context, url)
+                    true
+                }.getOrDefault(false)
+            if (!openedCustomTab) {
+                runCatching {
+                    val intent =
+                        Intent(Intent.ACTION_VIEW, url).apply {
+                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        }
+                    context.startActivity(intent)
+                }
             }
         }
         return !isLocalAsset

@@ -17,10 +17,17 @@ export interface OfflineCacheStats {
   entriesByKey: Record<string, { sizeBytes: number; cachedAt: number }>;
 }
 
-interface AndroidNativeBridge {
+export interface AndroidNativeBridge {
   getBridgeCapabilitiesJson?: () => string;
   startExternalOAuthFlow?: (authUrl: string) => boolean;
   consumePendingOAuthCallbackJson?: () => string;
+  exchangeOAuthCodeJson?: (
+    provider: string,
+    code: string,
+    codeVerifier: string,
+    redirectUri: string
+  ) => string;
+  refreshOAuthTokenJson?: (provider: string, refreshToken: string) => string;
   storeEncryptedToken?: (
     accountId: number,
     accessToken: string,
@@ -28,7 +35,33 @@ interface AndroidNativeBridge {
     expiresAtMillis: number,
     scopesCsv: string
   ) => boolean;
+  storeAccountToken?: (
+    accountId: number,
+    provider: string,
+    providerAccountId: string,
+    displayEmail: string | null,
+    accessToken: string,
+    refreshToken: string | null,
+    expiresAtMillis: number,
+    scopesCsv: string
+  ) => boolean;
+  getStoredTokenStatusJson?: (accountId: number) => string;
   revokeAndPurgeAccount?: (accountId: number) => boolean;
+  enqueuePendingOperationJson?: (
+    accountId: number,
+    provider: string,
+    operation: string,
+    fileId: string | null,
+    payloadJson: string | null
+  ) => number;
+  getPendingOperationsJson?: (accountId: number) => string;
+  markPendingOperationState?: (operationId: number, state: string) => boolean;
+  enqueueSyncWork?: (accountId: number) => boolean;
+  saveDownloadedFileBase64?: (
+    fileName: string,
+    mimeType: string,
+    base64Content: string
+  ) => boolean;
   pinFileBytesBase64?: (accountId: number, fileId: string, base64Content: string) => number;
   unpinFileBytes?: (accountId: number, fileId: string) => boolean;
   clearOfflineCache?: () => boolean;
@@ -45,11 +78,15 @@ const IDB_NAME = 'ucfm_offline_blobs_v1';
 const IDB_STORE = 'pinned_files';
 const IDB_VERSION = 1;
 
-function arrayBufferToBase64(buffer: ArrayBuffer): string {
+export function arrayBufferToBase64(buffer: ArrayBuffer): string {
   const bytes = new Uint8Array(buffer);
+  const chunkSize = 0x8000;
   let binary = '';
-  for (let i = 0; i < bytes.byteLength; i++) {
-    binary += String.fromCharCode(bytes[i]);
+  for (let i = 0; i < bytes.byteLength; i += chunkSize) {
+    const slice = bytes.subarray(i, Math.min(i + chunkSize, bytes.byteLength));
+    for (let j = 0; j < slice.length; j++) {
+      binary += String.fromCharCode(slice[j]);
+    }
   }
   return typeof btoa === 'function' ? btoa(binary) : '';
 }
@@ -308,6 +345,53 @@ class OfflineCacheService {
     }
 
     return { pinnedCount, totalBytes, entriesByKey };
+  }
+
+  public async saveBlobToDownloads(fileName: string, mimeType: string, blob: Blob): Promise<boolean> {
+    if (typeof window !== 'undefined' && window.UnifiedCloudBridge?.saveDownloadedFileBase64) {
+      const buffer = await blob.arrayBuffer();
+      const b64 = arrayBufferToBase64(buffer);
+      return window.UnifiedCloudBridge.saveDownloadedFileBase64(
+        fileName,
+        mimeType || 'application/octet-stream',
+        b64
+      );
+    }
+    return false;
+  }
+
+  public enqueueNativeOperation(
+    accountId: LocalAccountId,
+    provider: string,
+    operation: string,
+    fileId: string | null,
+    payloadJson: string | null
+  ): number | null {
+    if (typeof window !== 'undefined' && window.UnifiedCloudBridge?.enqueuePendingOperationJson) {
+      try {
+        const id = window.UnifiedCloudBridge.enqueuePendingOperationJson(
+          accountId,
+          provider,
+          operation,
+          fileId,
+          payloadJson
+        );
+        return id > 0 ? id : null;
+      } catch {
+        return null;
+      }
+    }
+    return null;
+  }
+
+  public markNativeOperationState(operationId: number, state: string): void {
+    if (typeof window !== 'undefined' && window.UnifiedCloudBridge?.markPendingOperationState) {
+      try {
+        window.UnifiedCloudBridge.markPendingOperationState(operationId, state);
+      } catch {
+        // ignore
+      }
+    }
   }
 }
 
