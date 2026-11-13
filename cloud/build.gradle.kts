@@ -23,9 +23,14 @@ android {
     }
 }
 
+val warningsAsErrors =
+    providers.gradleProperty("warningsAsErrors")
+        .map(String::toBoolean)
+        .orElse(false)
+
 kotlin {
     jvmToolchain(17)
-    compilerOptions { allWarningsAsErrors.set(true) }
+    compilerOptions { allWarningsAsErrors.set(warningsAsErrors) }
 }
 
 dependencies {

@@ -123,25 +123,43 @@ function getNativeBridgeCapabilities(): Record<string, unknown> | null {
 }
 
 export function isProviderOAuthConfigured(provider: ProviderId): boolean {
-  if (provider === 'GOOGLE_DRIVE') {
-    return true;
+  const bridgeCaps = getNativeBridgeCapabilities();
+  if (bridgeCaps) {
+    if (provider === 'GOOGLE_DRIVE') return Boolean(bridgeCaps.googleClientIdConfigured);
+    if (provider === 'ONE_DRIVE') return Boolean(bridgeCaps.oneDriveClientIdConfigured);
+    if (provider === 'DROPBOX') return Boolean(bridgeCaps.dropboxClientIdConfigured);
+    if (provider === 'BOX') return Boolean(bridgeCaps.boxClientIdConfigured);
   }
   if (getConfiguredClientId(provider)) {
     return true;
   }
-  const bridgeCaps = getNativeBridgeCapabilities();
-  if (!bridgeCaps) return false;
-  if (provider === 'ONE_DRIVE') return Boolean(bridgeCaps.oneDriveClientIdConfigured);
-  if (provider === 'DROPBOX') return Boolean(bridgeCaps.dropboxClientIdConfigured);
-  if (provider === 'BOX') return Boolean(bridgeCaps.boxClientIdConfigured);
-  return false;
+  return provider === 'GOOGLE_DRIVE';
+}
+
+function generateSecureUuid(): string {
+  const cryptoObj = globalThis.crypto;
+  if (cryptoObj && typeof cryptoObj.randomUUID === 'function') {
+    return cryptoObj.randomUUID();
+  }
+  const bytes = new Uint8Array(16);
+  if (cryptoObj && typeof cryptoObj.getRandomValues === 'function') {
+    cryptoObj.getRandomValues(bytes);
+  }
+  bytes[6] = (bytes[6] & 0x0f) | 0x40;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
 
 async function generatePkceChallenge(): Promise<{ verifier: string; challenge: string }> {
+  const cryptoObj = globalThis.crypto;
+  if (!cryptoObj?.getRandomValues || !cryptoObj?.subtle) {
+    throw new Error('Web Crypto API is unavailable for PKCE challenge generation.');
+  }
   const random = new Uint8Array(32);
-  window.crypto.getRandomValues(random);
+  cryptoObj.getRandomValues(random);
   const verifier = Array.from(random, (b) => b.toString(16).padStart(2, '0')).join('');
-  const digest = await window.crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier));
+  const digest = await cryptoObj.subtle.digest('SHA-256', new TextEncoder().encode(verifier));
   const base64 = btoa(String.fromCharCode(...new Uint8Array(digest)))
     .replace(/\+/g, '-')
     .replace(/\//g, '_')
@@ -154,23 +172,27 @@ class CloudProviderService {
 
   public storeTokenForAccount(accountId: LocalAccountId, entry: StoredTokenEntry): void {
     this.tokensByAccount.set(accountId, entry);
-    try {
-      sessionStorage.setItem(`${TOKEN_STORAGE_PREFIX}${accountId}`, JSON.stringify(entry));
-    } catch {
-      // ignore storage quota errors
+    if (typeof sessionStorage !== 'undefined') {
+      try {
+        sessionStorage.setItem(`${TOKEN_STORAGE_PREFIX}${accountId}`, JSON.stringify(entry));
+      } catch {
+        // ignore storage quota errors
+      }
     }
     if (typeof window === 'undefined') return;
-    if (window.UnifiedCloudBridge?.storeAccountToken && entry.provider) {
+    if (window.UnifiedCloudBridge?.storeAccountTokenJson && entry.provider) {
       try {
-        window.UnifiedCloudBridge.storeAccountToken(
-          accountId,
-          entry.provider,
-          entry.providerAccountId || `acct_${accountId}`,
-          entry.displayEmail || null,
-          entry.accessToken,
-          entry.refreshToken || null,
-          entry.expiresAtMillis || 0,
-          entry.grantedScopes.join(',')
+        window.UnifiedCloudBridge.storeAccountTokenJson(
+          JSON.stringify({
+            accountId,
+            provider: entry.provider,
+            providerAccountId: entry.providerAccountId || `acct_${accountId}`,
+            displayEmail: entry.displayEmail || null,
+            accessToken: entry.accessToken,
+            refreshToken: entry.refreshToken || null,
+            expiresAtMillis: entry.expiresAtMillis || 0,
+            scopesCsv: entry.grantedScopes.join(','),
+          })
         );
         return;
       } catch (e) {
@@ -271,7 +293,7 @@ class CloudProviderService {
     if (!accessToken) {
       const isAndroidWebView =
         typeof window !== 'undefined' &&
-        (window.location.hostname === 'appassets.androidplatform.net' ||
+        (window.location?.hostname === 'appassets.androidplatform.net' ||
           Boolean(window.UnifiedCloudBridge?.startExternalOAuthFlow));
 
       if (provider === 'GOOGLE_DRIVE' && !isAndroidWebView) {
@@ -286,10 +308,11 @@ class CloudProviderService {
         accessToken = credential.accessToken;
       } else {
         const clientId = getConfiguredClientId(provider);
-        const canLaunchNative = Boolean(window.UnifiedCloudBridge?.startExternalOAuthFlow);
+        const canLaunchNative =
+          typeof window !== 'undefined' && Boolean(window.UnifiedCloudBridge?.startExternalOAuthFlow);
         if (!clientId && !isProviderOAuthConfigured(provider)) {
           throw new Error(
-            `Not available: ${PROVIDERS[provider].name} OAuth 2.0 Client ID (VITE_${provider}_CLIENT_ID) is not configured in this environment. Configure the Client ID or provide a live OAuth 2.0 Bearer access token.`
+            `Not configured: ${PROVIDERS[provider].name} OAuth 2.0 Client ID is not configured in this environment. Configure the Client ID or provide a live OAuth 2.0 Bearer access token.`
           );
         }
         if (!clientId && provider === 'GOOGLE_DRIVE' && isAndroidWebView) {
@@ -299,10 +322,11 @@ class CloudProviderService {
         }
 
         const { verifier, challenge } = await generatePkceChallenge();
-        const state = crypto.randomUUID();
+        const state = generateSecureUuid();
+        const origin = typeof window !== 'undefined' && window.location?.origin ? window.location.origin : '';
         const redirectUri = isAndroidWebView
           ? 'com.unifiedcloud.filemanager:/oauth2redirect'
-          : `${window.location.origin}/`;
+          : `${origin}/`;
 
         const pkcePayload: PendingPkceState = {
           provider,
@@ -312,15 +336,17 @@ class CloudProviderService {
           scopes: requestedScopes,
           state,
         };
-        try {
-          sessionStorage.setItem(PKCE_STATE_KEY, JSON.stringify(pkcePayload));
-        } catch {
-          // ignore
+        if (typeof sessionStorage !== 'undefined') {
+          try {
+            sessionStorage.setItem(PKCE_STATE_KEY, JSON.stringify(pkcePayload));
+          } catch {
+            // ignore
+          }
         }
 
         if (!clientId) {
           throw new Error(
-            `Not available: Client ID for ${PROVIDERS[provider].name} is not set in the web bundle. Paste a verified OAuth Bearer token or set VITE_*_CLIENT_ID.`
+            `Not configured: Client ID for ${PROVIDERS[provider].name} is not set in the web bundle. Paste a verified OAuth Bearer token or set VITE_*_CLIENT_ID.`
           );
         }
 
@@ -333,7 +359,7 @@ class CloudProviderService {
           state
         );
 
-        if (canLaunchNative && window.UnifiedCloudBridge?.startExternalOAuthFlow) {
+        if (canLaunchNative && typeof window !== 'undefined' && window.UnifiedCloudBridge?.startExternalOAuthFlow) {
           const launched = window.UnifiedCloudBridge.startExternalOAuthFlow(authUrl);
           if (!launched) {
             throw new Error(`Unable to open Chrome Custom Tabs for ${PROVIDERS[provider].name}.`);
@@ -343,7 +369,9 @@ class CloudProviderService {
           );
         }
 
-        window.location.assign(authUrl);
+        if (typeof window !== 'undefined' && window.location) {
+          window.location.assign(authUrl);
+        }
         throw new Error(`Redirecting to ${PROVIDERS[provider].name} OAuth 2.0 + PKCE...`);
       }
     }
@@ -443,17 +471,17 @@ class CloudProviderService {
         accessToken?: string;
         refreshToken?: string;
         expiresInSeconds?: number;
+        expiresIn?: number;
         error?: string;
       };
       if (parsed.error || !parsed.accessToken) {
         throw new Error(parsed.error || 'Native OAuth code exchange failed.');
       }
+      const ttlSeconds = parsed.expiresInSeconds ?? parsed.expiresIn;
       return {
         accessToken: parsed.accessToken,
         refreshToken: parsed.refreshToken,
-        expiresAtMillis: parsed.expiresInSeconds
-          ? Date.now() + parsed.expiresInSeconds * 1000
-          : undefined,
+        expiresAtMillis: ttlSeconds ? Date.now() + ttlSeconds * 1000 : undefined,
       };
     }
 
@@ -495,14 +523,14 @@ class CloudProviderService {
           accessToken?: string;
           refreshToken?: string;
           expiresInSeconds?: number;
+          expiresIn?: number;
         };
+        const ttlSeconds = parsed.expiresInSeconds ?? parsed.expiresIn;
         if (parsed.accessToken) {
           return {
             accessToken: parsed.accessToken,
             refreshToken: parsed.refreshToken,
-            expiresAtMillis: parsed.expiresInSeconds
-              ? Date.now() + parsed.expiresInSeconds * 1000
-              : undefined,
+            expiresAtMillis: ttlSeconds ? Date.now() + ttlSeconds * 1000 : undefined,
           };
         }
       } catch {

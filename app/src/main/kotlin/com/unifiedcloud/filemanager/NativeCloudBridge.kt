@@ -27,8 +27,12 @@ import com.unifiedcloud.filemanager.domain.model.LocalAccountId
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.longOrNull
 import kotlinx.serialization.json.put
 import java.io.File
 import java.io.FileOutputStream
@@ -50,6 +54,7 @@ class NativeCloudBridge(
 ) {
     private val database by lazy { AppDatabase.getInstance(context) }
     private val oauthClient by lazy { NativeOAuthClient() }
+    private val json = Json { ignoreUnknownKeys = true }
     private val encryptedTokens = ConcurrentHashMap<Long, TokenSetEntity>()
     private val pendingOAuthRedirectUri = AtomicReference<String?>(null)
     private val offlineDir: File
@@ -128,41 +133,61 @@ class NativeCloudBridge(
         expiresAtMillis: Long,
         scopesCsv: String,
     ): Boolean =
-        storeAccountToken(
-            accountId = accountId,
-            provider = "GOOGLE_DRIVE",
-            providerAccountId = "acct_$accountId",
-            displayEmail = null,
-            accessToken = accessToken,
-            refreshToken = refreshToken,
-            expiresAtMillis = expiresAtMillis,
-            scopesCsv = scopesCsv,
+        persistAccountToken(
+            StoreTokenRequest(
+                accountId = accountId,
+                provider = "GOOGLE_DRIVE",
+                providerAccountId = "acct_$accountId",
+                displayEmail = null,
+                accessToken = accessToken,
+                refreshToken = refreshToken,
+                expiresAtMillis = expiresAtMillis,
+                scopesCsv = scopesCsv,
+            ),
         )
 
     @JavascriptInterface
-    fun storeAccountToken(
-        accountId: Long,
-        provider: String,
-        providerAccountId: String,
-        displayEmail: String?,
-        accessToken: String,
-        refreshToken: String?,
-        expiresAtMillis: Long,
-        scopesCsv: String,
-    ): Boolean {
-        if (accountId <= 0L || accessToken.isBlank()) return false
-        val localId = LocalAccountId(accountId)
+    fun storeAccountTokenJson(payloadJson: String): Boolean {
+        val obj =
+            runCatching { json.parseToJsonElement(payloadJson).jsonObject }.getOrNull()
+                ?: return false
+        val accountId = obj["accountId"]?.jsonPrimitive?.longOrNull ?: return false
+        val accessToken = obj["accessToken"]?.jsonPrimitive?.content.orEmpty()
+        val provider = obj["provider"]?.jsonPrimitive?.content.orEmpty().ifBlank { "GOOGLE_DRIVE" }
+        val providerAccountId =
+            obj["providerAccountId"]?.jsonPrimitive?.content.orEmpty().ifBlank { "acct_$accountId" }
+        val displayEmail = obj["displayEmail"]?.jsonPrimitive?.content?.takeIf { it.isNotBlank() }
+        val refreshToken = obj["refreshToken"]?.jsonPrimitive?.content?.takeIf { it.isNotBlank() }
+        val expiresAtMillis = obj["expiresAtMillis"]?.jsonPrimitive?.longOrNull ?: 0L
+        val scopesCsv = obj["scopesCsv"]?.jsonPrimitive?.content.orEmpty()
+        return persistAccountToken(
+            StoreTokenRequest(
+                accountId = accountId,
+                provider = provider,
+                providerAccountId = providerAccountId,
+                displayEmail = displayEmail,
+                accessToken = accessToken,
+                refreshToken = refreshToken,
+                expiresAtMillis = expiresAtMillis,
+                scopesCsv = scopesCsv,
+            ),
+        )
+    }
+
+    private fun persistAccountToken(request: StoreTokenRequest): Boolean {
+        if (request.accountId <= 0L || request.accessToken.isBlank()) return false
+        val localId = LocalAccountId(request.accountId)
         val scopes =
-            scopesCsv
+            request.scopesCsv
                 .split(',')
                 .map { it.trim() }
                 .filter { it.isNotEmpty() }
                 .toSet()
         val payload =
             DecryptedTokenPayload(
-                accessToken = accessToken,
-                refreshToken = refreshToken?.takeIf { it.isNotBlank() },
-                expiresAtEpochMillis = expiresAtMillis.takeIf { it > 0L },
+                accessToken = request.accessToken,
+                refreshToken = request.refreshToken?.takeIf { it.isNotBlank() },
+                expiresAtEpochMillis = request.expiresAtMillis.takeIf { it > 0L },
                 grantedScopes = scopes,
             )
         val encrypted =
@@ -171,10 +196,15 @@ class NativeCloudBridge(
                 payload = payload,
                 updatedAtMillis = System.currentTimeMillis(),
             )
-        encryptedTokens[accountId] = encrypted
+        encryptedTokens[request.accountId] = encrypted
         runBlocking(Dispatchers.IO) {
             runCatching {
-                ensureRoomAccountRow(accountId, provider, providerAccountId, displayEmail)
+                ensureRoomAccountRow(
+                    accountId = request.accountId,
+                    provider = request.provider,
+                    providerAccountId = request.providerAccountId,
+                    displayEmail = request.displayEmail,
+                )
                 database.accountDao().rotateToken(encrypted)
             }.onFailure { err ->
                 Log.w(TAG, "Room token persistence skipped: ${err.message}")
@@ -431,6 +461,17 @@ class NativeCloudBridge(
         val cleaned = fileId.replace(Regex("[^A-Za-z0-9._-]"), "_")
         return "acct_${accountId}_$cleaned.bin"
     }
+
+    private data class StoreTokenRequest(
+        val accountId: Long,
+        val provider: String,
+        val providerAccountId: String,
+        val displayEmail: String?,
+        val accessToken: String,
+        val refreshToken: String?,
+        val expiresAtMillis: Long,
+        val scopesCsv: String,
+    )
 
     companion object {
         const val JS_INTERFACE_NAME = "UnifiedCloudBridge"

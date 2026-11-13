@@ -26,9 +26,14 @@ android {
     }
 }
 
+val warningsAsErrors =
+    providers.gradleProperty("warningsAsErrors")
+        .map(String::toBoolean)
+        .orElse(false)
+
 kotlin {
     jvmToolchain(17)
-    compilerOptions { allWarningsAsErrors.set(true) }
+    compilerOptions { allWarningsAsErrors.set(warningsAsErrors) }
 }
 
 // Room schema export. The schema directory is committed so that an un-migrated

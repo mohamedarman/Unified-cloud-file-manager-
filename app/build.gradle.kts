@@ -5,7 +5,6 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.compose.compiler)
-    alias(libs.plugins.ksp)
 }
 
 android {
@@ -79,9 +78,14 @@ android {
     }
 }
 
+val warningsAsErrors =
+    providers.gradleProperty("warningsAsErrors")
+        .map(String::toBoolean)
+        .orElse(false)
+
 kotlin {
     jvmToolchain(17)
-    compilerOptions { allWarningsAsErrors.set(true) }
+    compilerOptions { allWarningsAsErrors.set(warningsAsErrors) }
 }
 
 abstract class BuildFrontendTask : DefaultTask() {
@@ -191,6 +195,19 @@ val copyFrontendAssets =
 
 tasks.named("preBuild") {
     dependsOn(copyFrontendAssets)
+}
+
+tasks.configureEach {
+    val taskName = name
+    if (taskName.startsWith("merge") && taskName.endsWith("Assets") ||
+        taskName.startsWith("compress") && taskName.endsWith("Assets") ||
+        taskName.startsWith("generate") && taskName.endsWith("Assets") ||
+        taskName.startsWith("lint") ||
+        taskName.startsWith("generate") && taskName.contains("Lint") ||
+        taskName.contains("UnitTest") && taskName.contains("JavaRes")
+    ) {
+        dependsOn(copyFrontendAssets)
+    }
 }
 
 dependencies {

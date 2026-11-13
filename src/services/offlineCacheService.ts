@@ -35,16 +35,7 @@ export interface AndroidNativeBridge {
     expiresAtMillis: number,
     scopesCsv: string
   ) => boolean;
-  storeAccountToken?: (
-    accountId: number,
-    provider: string,
-    providerAccountId: string,
-    displayEmail: string | null,
-    accessToken: string,
-    refreshToken: string | null,
-    expiresAtMillis: number,
-    scopesCsv: string
-  ) => boolean;
+  storeAccountTokenJson?: (payloadJson: string) => boolean;
   getStoredTokenStatusJson?: (accountId: number) => string;
   revokeAndPurgeAccount?: (accountId: number) => boolean;
   enqueuePendingOperationJson?: (

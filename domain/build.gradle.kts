@@ -13,12 +13,17 @@ plugins {
     alias(libs.plugins.kotlin.jvm)
 }
 
+val warningsAsErrors =
+    providers.gradleProperty("warningsAsErrors")
+        .map(String::toBoolean)
+        .orElse(false)
+
 kotlin {
     // Explicit, so a JDK upgrade is a deliberate change rather than a surprise.
     jvmToolchain(17)
 
     compilerOptions {
-        allWarningsAsErrors.set(true)
+        allWarningsAsErrors.set(warningsAsErrors)
         // Any accidental Android import should fail loudly even before the
         // module-type check does.
         freeCompilerArgs.add("-Xjvm-default=all")

@@ -84,7 +84,7 @@ class CloudSyncWorker(
                 .getOrElse { err -> return kotlin.Result.failure(err) }
 
         val providerId =
-            runCatching { ProviderId.valueOf(account.provider) }
+            runCatching { ProviderId(account.provider) }
                 .getOrDefault(ProviderId.GOOGLE_DRIVE)
         val cloudProvider =
             HttpCloudProvider(

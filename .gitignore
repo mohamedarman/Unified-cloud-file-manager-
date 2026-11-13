@@ -12,6 +12,7 @@ local.properties
 captures/
 .externalNativeBuild/
 .cxx/
+app/src/main/assets/
 
 # Signing material. A client secret or signing key must never be committed
 # (Rules.md TK-2, BE-7, SEC-02).

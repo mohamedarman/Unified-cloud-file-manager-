@@ -79,7 +79,10 @@ internal class NativeOAuthClient(
                     put("ok", true)
                     put("accessToken", parsed["access_token"]?.jsonPrimitive?.content.orEmpty())
                     put("refreshToken", parsed["refresh_token"]?.jsonPrimitive?.content.orEmpty())
-                    put("expiresIn", parsed["expires_in"]?.jsonPrimitive?.longOrNull ?: DEFAULT_EXPIRES_SEC)
+                    put(
+                        "expiresInSeconds",
+                        parsed["expires_in"]?.jsonPrimitive?.longOrNull ?: DEFAULT_EXPIRES_SEC,
+                    )
                     put("scope", parsed["scope"]?.jsonPrimitive?.content.orEmpty())
                 }.toString()
             }

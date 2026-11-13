@@ -176,7 +176,6 @@ interface FileManagerContextType {
   ) => void;
   clearAuditLogs: () => void;
   resetAllData: () => void;
-  loadSampleWorkspace: () => void;
 }
 
 const FileManagerContext = createContext<FileManagerContextType | undefined>(undefined);
@@ -2023,31 +2022,6 @@ export const FileManagerProvider: React.FC<{ children: ReactNode }> = ({ childre
     setInspectedFile(null);
   };
 
-  const loadSampleWorkspace = () => {
-    const isDev = Boolean(
-      (import.meta as unknown as { env?: { DEV?: boolean } }).env?.DEV
-    );
-    if (!isDev) {
-      console.warn('Sample workspace seeding is disabled in production builds.');
-      return;
-    }
-    void import('../data/mockData').then((mod) => {
-      setAccounts(mod.INITIAL_ACCOUNTS);
-      setFiles(mod.INITIAL_FILES);
-      setCapabilities(mod.INITIAL_CAPABILITIES);
-      setQuotas(mod.INITIAL_QUOTA);
-      safePersistFirestore(
-        () =>
-          databaseService.seedWorkspaceIfEmpty(
-            mod.INITIAL_ACCOUNTS,
-            mod.INITIAL_FILES,
-            mod.INITIAL_QUOTA
-          ),
-        'seedWorkspaceIfEmpty'
-      );
-    });
-  };
-
   const syncAccount = async (accountId: LocalAccountId) => {
     const account = accounts.find((a) => a.localId === accountId);
     if (!account) return;
@@ -2197,7 +2171,6 @@ export const FileManagerProvider: React.FC<{ children: ReactNode }> = ({ childre
         addAuditLog,
         clearAuditLogs,
         resetAllData,
-        loadSampleWorkspace,
       }}
     >
       {children}

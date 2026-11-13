@@ -166,7 +166,7 @@ class MainActivity : ComponentActivity() {
             if (result.resultCode == RESULT_OK && clipData != null && clipData.itemCount > 0) {
                 val collected =
                     (0 until clipData.itemCount)
-                        .mapNotNull { index -> clipData.getItemAt(index)?.uri }
+                        .mapNotNull { index -> clipData.getItemAt(index).uri }
                         .toTypedArray()
                 collected.takeIf { it.isNotEmpty() }
             } else {

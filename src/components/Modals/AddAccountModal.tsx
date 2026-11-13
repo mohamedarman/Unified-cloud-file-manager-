@@ -19,9 +19,7 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({ onClose }) => 
   const [error, setError] = useState<string | null>(null);
 
   const providerMeta = PROVIDERS[selectedProvider];
-  const hasOAuthClientConfigured =
-    selectedProvider === 'GOOGLE_DRIVE' ||
-    cloudProviderService.isOAuthConfigured(selectedProvider);
+  const hasOAuthClientConfigured = cloudProviderService.isOAuthConfigured(selectedProvider);
 
   const handleStartOAuth = async () => {
     setError(null);
@@ -115,8 +113,7 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({ onClose }) => 
                 {(Object.keys(PROVIDERS) as ProviderId[]).map((pId) => {
                   const p = PROVIDERS[pId];
                   const isSelected = selectedProvider === pId;
-                  const configured =
-                    pId === 'GOOGLE_DRIVE' || cloudProviderService.isOAuthConfigured(pId);
+                  const configured = cloudProviderService.isOAuthConfigured(pId);
 
                   return (
                     <button
@@ -144,7 +141,7 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({ onClose }) => 
                         <Check className="w-3.5 h-3.5 text-blue-600 shrink-0" />
                       ) : !configured ? (
                         <span className="text-[9px] text-amber-600 dark:text-amber-400 font-normal">
-                          Token/ID req
+                          Not configured
                         </span>
                       ) : null}
                     </button>
