@@ -6,6 +6,7 @@ import { FileManagerProvider } from './context/FileManagerContext';
 import { ThemeProvider } from './context/ThemeContext';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
 import './index.css';
+import './utils/testConnection';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

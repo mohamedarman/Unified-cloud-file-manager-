@@ -129,14 +129,16 @@ export const databaseService = {
   async syncUserProfile(user: AuthUser): Promise<void> {
     const uid = requireActiveFirestoreUid('users/<unauthenticated>');
     const path = `users/${uid}`;
+    const safeEmail = (user.email || '').trim().slice(0, 254);
+    const safeDisplayName = (user.name || safeEmail.split('@')[0] || 'Workspace User').trim().slice(0, 120);
     try {
       await setDoc(
         doc(db, 'users', uid),
         sanitizeForFirestore({
           uid,
-          localUserId: user.id,
-          email: user.email,
-          displayName: user.name,
+          localUserId: user.id.slice(0, 128),
+          email: safeEmail,
+          displayName: safeDisplayName,
           provider: user.provider,
           createdAt: new Date(user.createdAt).toISOString(),
           updatedAt: new Date().toISOString(),
@@ -144,8 +146,8 @@ export const databaseService = {
         { merge: true }
       );
     } catch (error) {
-      handleFirestoreError(error, OperationType.WRITE, path);
-      throw error;
+      const errInfo = handleFirestoreError(error, OperationType.WRITE, path);
+      throw new Error(JSON.stringify(errInfo));
     }
   },
 

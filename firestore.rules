@@ -2,6 +2,13 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     // ===============================================================
+    // Global Safety Net (Default Deny)
+    // ===============================================================
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // ===============================================================
     // Helper Functions
     // ===============================================================
     function isAuthenticated() {
@@ -19,9 +26,24 @@ service cloud.firestore {
     }
 
     function isValidUserProfile(data) {
-      return data.uid is string && data.uid.size() > 0 && data.uid.size() <= 128 &&
+      return data.keys().hasAll(['uid', 'email', 'displayName']) &&
+        data.keys().hasOnly([
+          'uid',
+          'localUserId',
+          'email',
+          'displayName',
+          'provider',
+          'createdAt',
+          'updatedAt'
+        ]) &&
+        data.uid is string && data.uid == request.auth.uid &&
+        data.uid.size() > 0 && data.uid.size() <= 128 &&
         data.email is string && data.email.size() > 3 && data.email.size() <= 254 &&
-        data.displayName is string && data.displayName.size() > 0 && data.displayName.size() <= 120;
+        data.displayName is string && data.displayName.size() > 0 && data.displayName.size() <= 120 &&
+        (!('localUserId' in data) || (data.localUserId is string && data.localUserId.size() <= 128)) &&
+        (!('provider' in data) || (data.provider is string && data.provider.size() <= 32)) &&
+        (!('createdAt' in data) || (data.createdAt is string && data.createdAt.size() <= 64)) &&
+        (!('updatedAt' in data) || (data.updatedAt is string && data.updatedAt.size() <= 64));
     }
 
     function isValidAccount(data) {
@@ -112,15 +134,6 @@ service cloud.firestore {
         allow create, update: if isOwner(userId) && isValidAuditLog(request.resource.data);
         allow delete: if isOwner(userId) || isAdmin();
       }
-    }
-
-    // Legacy path compatibility
-    match /accounts/{userId}/{account=**} {
-      allow read, write: if isOwner(userId);
-    }
-
-    match /files/{userId}/{file=**} {
-      allow read, write: if isOwner(userId);
     }
   }
 }

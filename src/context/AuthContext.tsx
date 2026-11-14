@@ -72,7 +72,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             setSession(res.session);
             setSessionError(null);
             refreshAvailableUsers();
-            void databaseService.syncUserProfile(res.user);
+            void databaseService.syncUserProfile(res.user).catch((err) => {
+              console.warn('Profile sync warning:', err);
+            });
           }
         } else {
           const active = await authService.validateSession();

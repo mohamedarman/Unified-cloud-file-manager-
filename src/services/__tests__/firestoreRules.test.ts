@@ -12,8 +12,11 @@ describe('Firestore Security Rules & Native OAuth Configuration Verification', (
 
   it('enforces authenticated user ownership and schema validation in firestore.rules', () => {
     expect(rulesText).toContain("rules_version = '2';");
+    expect(rulesText).toContain('match /{document=**}');
+    expect(rulesText).toContain('allow read, write: if false;');
     expect(rulesText).toContain('return request.auth != null;');
     expect(rulesText).toContain('return isAuthenticated() && request.auth.uid == userId;');
+    expect(rulesText).toContain('data.uid == request.auth.uid');
     expect(rulesText).not.toMatch(/allow\s+read,\s*write:\s*if\s+true\b/);
     expect(rulesText).toContain('match /users/{userId}');
     expect(rulesText).toContain('isValidUserProfile(request.resource.data)');
