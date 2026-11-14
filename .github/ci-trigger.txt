@@ -1,0 +1,5 @@
+Triggered CI to re-run after detekt fix
+
+This file exists only to cause a tiny commit on the dependabot PR branch so CI runs again and I can fetch fresh logs.
+
+Timestamp: 2026-10-14T15:35:00Z
