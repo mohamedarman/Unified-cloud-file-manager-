@@ -115,11 +115,19 @@ function encodeDocId(rawKey: string): string {
 
 export const databaseService = {
   async testConnection(): Promise<boolean> {
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+      console.warn('Browser is offline; Firestore will sync when connectivity returns.');
+      return false;
+    }
     try {
       await getDocFromServer(doc(db, 'connection_test', 'check'));
       return true;
     } catch (error) {
-      if (error instanceof Error && error.message.includes('the client is offline')) {
+      if (
+        error instanceof Error &&
+        (error.message.includes('the client is offline') ||
+          error.message.includes('unavailable'))
+      ) {
         console.warn('Firestore client is currently operating in offline/local mode.');
       }
       return false;

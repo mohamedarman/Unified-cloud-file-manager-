@@ -178,7 +178,7 @@ class HttpCloudProvider(
                     .build()
             }.map { root -> MultiCloudResponseParser.parseFilePage(providerId, accountId, root) }
         } else if (providerId != ProviderId.GOOGLE_DRIVE) {
-            executor.unsupported("Shared-with-me listing is not available on ${providerId.name}")
+            executor.unsupported("Shared-with-me listing is not available on ${providerId.value}")
         } else {
             executor.listFilteredDriveFiles(
                 accountId = accountId,
@@ -194,7 +194,7 @@ class HttpCloudProvider(
         pageSize: Int,
     ): Result<Page<CloudFile>> =
         if (providerId != ProviderId.GOOGLE_DRIVE) {
-            executor.unsupported("Shared-by-me listing is not available on ${providerId.name}")
+            executor.unsupported("Shared-by-me listing is not available on ${providerId.value}")
         } else {
             executor.listFilteredDriveFiles(
                 accountId = accountId,
@@ -284,7 +284,7 @@ class HttpCloudProvider(
                 }
             ProviderId.GOOGLE_DRIVE ->
                 executor.patchDriveFile(accountId, fileId, buildJsonObject { put("trashed", false) }).map { }
-            else -> executor.unsupported("Restore from trash is not available via ${providerId.name} API")
+            else -> executor.unsupported("Restore from trash is not available via ${providerId.value} API")
         }
 
     override suspend fun deletePermanently(
@@ -314,7 +314,7 @@ class HttpCloudProvider(
         starred: Boolean,
     ): Result<Unit> =
         if (providerId != ProviderId.GOOGLE_DRIVE) {
-            executor.unsupported("Starring metadata is not supported by ${providerId.name}")
+            executor.unsupported("Starring metadata is not supported by ${providerId.value}")
         } else {
             executor.patchDriveFile(accountId, fileId, buildJsonObject { put("starred", starred) }).map { }
         }

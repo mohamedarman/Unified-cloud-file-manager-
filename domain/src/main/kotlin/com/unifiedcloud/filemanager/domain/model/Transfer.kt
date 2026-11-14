@@ -84,13 +84,12 @@ data class ByteRange(val start: Long, val endInclusive: Long) {
 /**
  * Progress reporting.
  *
- * A [suspend] callback rather than a Flow because progress is a stream of
- * updates, not state: buffering it would deliver a backlog of stale percentages
- * long after the transfer finished. Backpressure drops intermediate values
- * naturally (X-3).
+ * A callback rather than a Flow because progress is a stream of updates, not
+ * state: buffering it would deliver a backlog of stale percentages long after
+ * the transfer finished. Backpressure drops intermediate values naturally (X-3).
  */
 fun interface ProgressSink {
-    suspend fun onProgress(
+    fun onProgress(
         bytesTransferred: Long,
         totalBytes: Long?,
     )
