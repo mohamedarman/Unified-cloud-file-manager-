@@ -158,9 +158,10 @@ internal object MultiCloudProviderRequests {
         token: String,
         query: FileQuery,
     ): Request {
+        val parentId = query.parentFolderId
         val parentClause =
-            if (query.parentFolderId != null) {
-                "'${query.parentFolderId?.value}' in parents"
+            if (parentId != null) {
+                "'${parentId.value}' in parents"
             } else {
                 "'root' in parents"
             }
@@ -180,12 +181,13 @@ internal object MultiCloudProviderRequests {
         token: String,
         query: FileQuery,
     ): Request {
+        val parentId = query.parentFolderId
         val url =
             query.pageToken
-                ?: if (query.parentFolderId == null || query.parentFolderId?.value == "root") {
+                ?: if (parentId == null || parentId.value == "root") {
                     "$apiBaseUrl/root/children?\$top=${query.pageSize}"
                 } else {
-                    "$apiBaseUrl/items/${query.parentFolderId?.value}/children?\$top=${query.pageSize}"
+                    "$apiBaseUrl/items/${parentId.value}/children?\$top=${query.pageSize}"
                 }
         return getRequest(url, token)
     }

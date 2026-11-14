@@ -41,11 +41,6 @@
             android:foregroundServiceType="dataSync"
             tools:node="merge" />
 
-        <activity
-            android:name="androidx.compose.ui.tooling.PreviewActivity"
-            android:exported="false"
-            tools:node="replace" />
-
     </application>
 
 </manifest>
