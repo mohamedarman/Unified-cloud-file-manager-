@@ -40,8 +40,7 @@ class KeystoreTokenVault(
     /**
      * Returns the single-flight refresh mutex dedicated to [accountId].
      */
-    fun refreshMutexFor(accountId: LocalAccountId): Mutex =
-        refreshMutexes.computeIfAbsent(accountId.value) { Mutex() }
+    fun refreshMutexFor(accountId: LocalAccountId): Mutex = refreshMutexes.computeIfAbsent(accountId.value) { Mutex() }
 
     /**
      * Encrypts [payload] into a [TokenSetEntity] ready for Room persistence.

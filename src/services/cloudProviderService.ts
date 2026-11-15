@@ -280,6 +280,44 @@ class CloudProviderService {
     return entry.accessToken;
   }
 
+  public resolveProviderOAuthScopes(provider: ProviderId, requestedScopes: string[]): string[] {
+    const joined = requestedScopes.join(' ').toLowerCase();
+    const wantsWrite =
+      joined.includes('write') ||
+      joined.includes('drive.file') ||
+      (joined.includes('auth/drive') && !joined.includes('readonly'));
+
+    switch (provider) {
+      case 'GOOGLE_DRIVE':
+        return wantsWrite
+          ? [
+              'https://www.googleapis.com/auth/drive',
+              'https://www.googleapis.com/auth/userinfo.email',
+              'https://www.googleapis.com/auth/userinfo.profile',
+            ]
+          : [
+              'https://www.googleapis.com/auth/drive.readonly',
+              'https://www.googleapis.com/auth/userinfo.email',
+              'https://www.googleapis.com/auth/userinfo.profile',
+            ];
+      case 'ONE_DRIVE':
+        return wantsWrite
+          ? ['Files.ReadWrite.All', 'User.Read', 'offline_access']
+          : ['Files.Read.All', 'User.Read', 'offline_access'];
+      case 'DROPBOX':
+        return wantsWrite
+          ? [
+              'account_info.read',
+              'files.metadata.read',
+              'files.content.read',
+              'files.content.write',
+            ]
+          : ['account_info.read', 'files.metadata.read', 'files.content.read'];
+      case 'BOX':
+        return wantsWrite ? ['root_readwrite'] : ['root_readonly'];
+    }
+  }
+
   public async authorizeAndVerifyAccount(
     provider: ProviderId,
     requestedScopes: string[],
@@ -289,6 +327,7 @@ class CloudProviderService {
     let accessToken = explicitAccessToken?.trim() || '';
     let refreshToken: string | undefined;
     let expiresAtMillis: number | undefined;
+    const providerOAuthScopes = this.resolveProviderOAuthScopes(provider, requestedScopes);
 
     if (!accessToken) {
       const isAndroidWebView =
@@ -298,7 +337,7 @@ class CloudProviderService {
 
       if (provider === 'GOOGLE_DRIVE' && !isAndroidWebView) {
         const googleProvider = new GoogleAuthProvider();
-        requestedScopes.forEach((s) => googleProvider.addScope(s));
+        providerOAuthScopes.forEach((s) => googleProvider.addScope(s));
         googleProvider.setCustomParameters({ prompt: 'select_account' });
         const result = await signInWithPopup(firebaseAuth, googleProvider);
         const credential = GoogleAuthProvider.credentialFromResult(result);
@@ -354,7 +393,7 @@ class CloudProviderService {
           provider,
           clientId,
           redirectUri,
-          requestedScopes,
+          providerOAuthScopes,
           challenge,
           state
         );

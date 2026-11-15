@@ -25,8 +25,9 @@ internal class NativeOAuthClient(
         codeVerifier: String,
         redirectUri: String,
     ): String {
-        val config = endpointFor(provider)
-            ?: return errorJson("Provider $provider OAuth client ID is not configured in BuildConfig")
+        val config =
+            endpointFor(provider)
+                ?: return errorJson("Provider $provider OAuth client ID is not configured in BuildConfig")
         if (code.isBlank() || codeVerifier.isBlank()) {
             return errorJson("Missing OAuth authorization code or PKCE verifier")
         }
@@ -45,8 +46,9 @@ internal class NativeOAuthClient(
         provider: String,
         refreshToken: String,
     ): String {
-        val config = endpointFor(provider)
-            ?: return errorJson("Provider $provider OAuth client ID is not configured in BuildConfig")
+        val config =
+            endpointFor(provider)
+                ?: return errorJson("Provider $provider OAuth client ID is not configured in BuildConfig")
         if (refreshToken.isBlank()) {
             return errorJson("Missing refresh token")
         }
@@ -78,6 +80,7 @@ internal class NativeOAuthClient(
                 buildJsonObject {
                     put("ok", true)
                     put("accessToken", parsed["access_token"]?.jsonPrimitive?.content.orEmpty())
+                    put("idToken", parsed["id_token"]?.jsonPrimitive?.content.orEmpty())
                     put("refreshToken", parsed["refresh_token"]?.jsonPrimitive?.content.orEmpty())
                     put(
                         "expiresInSeconds",

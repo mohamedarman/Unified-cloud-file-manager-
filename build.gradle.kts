@@ -95,23 +95,26 @@ val verifyDomainPurity by tasks.registering {
 
     val domainProject = project(":domain")
     val hasJvmPlugin = domainProject.plugins.hasPlugin("org.jetbrains.kotlin.jvm")
-    val appliedBannedPlugins = listOf(
-        "org.jetbrains.kotlin.android",
-        "com.android.application",
-        "com.android.library",
-        "com.android.dynamic-feature",
-    ).filter { domainProject.plugins.hasPlugin(it) }
+    val appliedBannedPlugins =
+        listOf(
+            "org.jetbrains.kotlin.android",
+            "com.android.application",
+            "com.android.library",
+            "com.android.dynamic-feature",
+        ).filter { domainProject.plugins.hasPlugin(it) }
 
-    val bannedPrefixes = listOf(
-        "androidx.",
-        "com.google.firebase",
-        "com.google.android.gms",
-        "com.google.android.material",
-    )
-    val declaredBannedDependencies = domainProject.configurations.flatMap { config ->
-        config.dependencies.filter { dep -> bannedPrefixes.any { dep.name.startsWith(it) } }
-            .map { dep -> ":${config.name} declares '${dep.name}'" }
-    }
+    val bannedPrefixes =
+        listOf(
+            "androidx.",
+            "com.google.firebase",
+            "com.google.android.gms",
+            "com.google.android.material",
+        )
+    val declaredBannedDependencies =
+        domainProject.configurations.flatMap { config ->
+            config.dependencies.filter { dep -> bannedPrefixes.any { dep.name.startsWith(it) } }
+                .map { dep -> ":${config.name} declares '${dep.name}'" }
+        }
 
     doLast {
         val errors = mutableListOf<String>()
@@ -130,7 +133,7 @@ val verifyDomainPurity by tasks.registering {
 
         if (errors.isNotEmpty()) {
             throw GradleException(
-                "Domain purity violated:\n" + errors.joinToString("\n") { "  - $it" }
+                "Domain purity violated:\n" + errors.joinToString("\n") { "  - $it" },
             )
         }
 
@@ -146,30 +149,32 @@ val scanProhibitedPhrasing by tasks.registering {
     description = "Rejects any banned storage claim in source, resources, or analytics names."
 
     val projectRootDir = layout.projectDirectory.asFile
-    val roots = listOf(
-        projectRootDir.resolve("app/src"),
-        projectRootDir.resolve("data/src"),
-        projectRootDir.resolve("cloud/src"),
-        projectRootDir.resolve("core/src"),
-        projectRootDir.resolve("domain/src"),
-    )
-    val terms = listOf(
-        "unlimited google storage",
-        "unlimited storage",
-        "free extra storage",
-        "free extra google storage",
-        "extra google storage",
-        "extra storage",
-        "bypass google drive limits",
-        "bypass drive limits",
-        "pooled storage",
-        "pool storage",
-        "combined quota",
-        "combined storage",
-        "add storage",
-        "more storage for free",
-        "storage pool",
-    )
+    val roots =
+        listOf(
+            projectRootDir.resolve("app/src"),
+            projectRootDir.resolve("data/src"),
+            projectRootDir.resolve("cloud/src"),
+            projectRootDir.resolve("core/src"),
+            projectRootDir.resolve("domain/src"),
+        )
+    val terms =
+        listOf(
+            "unlimited google storage",
+            "unlimited storage",
+            "free extra storage",
+            "free extra google storage",
+            "extra google storage",
+            "extra storage",
+            "bypass google drive limits",
+            "bypass drive limits",
+            "pooled storage",
+            "pool storage",
+            "combined quota",
+            "combined storage",
+            "add storage",
+            "more storage for free",
+            "storage pool",
+        )
     val excludedDirNames = setOf("build", ".git", "node_modules")
 
     doLast {
@@ -194,7 +199,7 @@ val scanProhibitedPhrasing by tasks.registering {
         if (findings.isNotEmpty()) {
             throw GradleException(
                 "Prohibited phrasing found (Rules.md §1, §23). The product adds no storage " +
-                    "and never claims to:\n" + findings.joinToString("\n") { "  - $it" }
+                    "and never claims to:\n" + findings.joinToString("\n") { "  - $it" },
             )
         }
     }
@@ -208,19 +213,21 @@ val scanApkSecrets by tasks.registering {
     description = "Fails if a client secret or token-shaped literal is committed to source."
 
     val projectRootDir = layout.projectDirectory.asFile
-    val roots = listOf(
-        projectRootDir.resolve("app/src"),
-        projectRootDir.resolve("data/src"),
-        projectRootDir.resolve("cloud/src"),
-        projectRootDir.resolve("core/src"),
-    )
+    val roots =
+        listOf(
+            projectRootDir.resolve("app/src"),
+            projectRootDir.resolve("data/src"),
+            projectRootDir.resolve("cloud/src"),
+            projectRootDir.resolve("core/src"),
+        )
     val excludedDirNames = setOf("build", ".git", "test", "androidTest")
-    val secretPatterns = listOf(
-        Regex("""GOCSPX-[A-Za-z0-9_-]{10,}"""),
-        Regex("""\b1//[A-Za-z0-9_-]{30,}"""),   // legacy API key style
-        Regex("""\bya29\.[A-Za-z0-9_-]{20,}"""), // OAuth access token
-        Regex("""\b1//0"""),                     // refresh token prefix
-    )
+    val secretPatterns =
+        listOf(
+            Regex("""GOCSPX-[A-Za-z0-9_-]{10,}"""),
+            Regex("""\b1//[A-Za-z0-9_-]{30,}"""), // legacy API key style
+            Regex("""\bya29\.[A-Za-z0-9_-]{20,}"""), // OAuth access token
+            Regex("""\b1//0"""), // refresh token prefix
+        )
 
     doLast {
         val findings = mutableListOf<String>()
@@ -244,7 +251,7 @@ val scanApkSecrets by tasks.registering {
         if (findings.isNotEmpty()) {
             throw GradleException(
                 "Secret-shaped literal found in source (Rules.md TK-2, SEC-02):\n" +
-                    findings.joinToString("\n") { "  - $it" }
+                    findings.joinToString("\n") { "  - $it" },
             )
         }
     }
@@ -295,7 +302,7 @@ val verifySourceEncoding by tasks.registering {
 
         if (findings.isNotEmpty()) {
             throw GradleException(
-                "Source encoding violations:\n" + findings.joinToString("\n") { "  - $it" }
+                "Source encoding violations:\n" + findings.joinToString("\n") { "  - $it" },
             )
         }
     }

@@ -86,8 +86,7 @@ class HttpCloudProvider(
             quotaGovernor = quotaGovernor,
         )
 
-    override suspend fun listAccounts(): Result<List<AccountRef>> =
-        runCatching { accountsSupplier() }
+    override suspend fun listAccounts(): Result<List<AccountRef>> = runCatching { accountsSupplier() }
 
     override suspend fun getCapabilities(accountId: LocalAccountId): Result<ProviderCapabilities> =
         getQuotaInfo(accountId).map {

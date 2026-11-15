@@ -27,7 +27,7 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({ onClose }) => 
 
     if (!hasOAuthClientConfigured && !trimmedToken) {
       setError(
-        `Not available: ${providerMeta.name} OAuth 2.0 Client ID is not configured in environment variables (VITE_${selectedProvider}_CLIENT_ID). Provide a live OAuth 2.0 Bearer access token below or configure the client ID.`
+        `Not configured: ${providerMeta.name} OAuth 2.0 Client ID is not configured (VITE_${selectedProvider}_CLIENT_ID / BuildConfig). Provide a live OAuth 2.0 Bearer access token below or configure the OAuth client ID.`
       );
       return;
     }
@@ -137,13 +137,14 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({ onClose }) => 
                         />
                         <span className="text-slate-900 dark:text-white truncate">{p.name}</span>
                       </div>
-                      {isSelected ? (
-                        <Check className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-                      ) : !configured ? (
-                        <span className="text-[9px] text-amber-600 dark:text-amber-400 font-normal">
-                          Not configured
-                        </span>
-                      ) : null}
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        {!configured && (
+                          <span className="text-[9px] text-amber-600 dark:text-amber-400 font-normal">
+                            Not configured
+                          </span>
+                        )}
+                        {isSelected && <Check className="w-3.5 h-3.5 text-blue-600 shrink-0" />}
+                      </div>
                     </button>
                   );
                 })}

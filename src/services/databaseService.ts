@@ -150,8 +150,7 @@ export const databaseService = {
           provider: user.provider,
           createdAt: new Date(user.createdAt).toISOString(),
           updatedAt: new Date().toISOString(),
-        }),
-        { merge: true }
+        })
       );
     } catch (error) {
       const errInfo = handleFirestoreError(error, OperationType.WRITE, path);

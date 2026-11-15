@@ -49,7 +49,7 @@ jobs:
         run: ./gradlew :verifyDomainPurity :scanProhibitedPhrasing :scanApkSecrets :verifySourceEncoding :data:kspDebugKotlin -PwarningsAsErrors=true
 
       - name: Run Unit Tests and Static Analysis
-        run: ./gradlew :domain:test testDebugUnitTest lintDebug detekt ktlintCheck -PwarningsAsErrors=true
+        run: ./gradlew :domain:test testDebugUnitTest lintDebug detekt ktlintCheck -PwarningsAsErrors=true --continue
 
       - name: Build Debug APK
         env:

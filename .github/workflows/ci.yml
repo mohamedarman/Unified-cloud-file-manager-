@@ -83,13 +83,13 @@ jobs:
         run: ./gradlew assembleDebug assembleRelease -PwarningsAsErrors=true
 
       - name: Lint
-        run: ./gradlew lintDebug -PwarningsAsErrors=true
+        run: ./gradlew lintDebug -PwarningsAsErrors=true --continue
 
       - name: Detekt
-        run: ./gradlew detekt
+        run: ./gradlew detekt --continue
 
       - name: ktlint
-        run: ./gradlew ktlintCheck
+        run: ./gradlew ktlintCheck --continue
 
       - name: Upload lint report
         if: always()

@@ -2,6 +2,8 @@ import React, { createContext, useContext, useState, useEffect, ReactNode, useCa
 import { auth as firebaseAuth } from '../firebase';
 import {
   signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
   GoogleAuthProvider,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
@@ -53,6 +55,32 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   useEffect(() => {
     let isMounted = true;
+
+    // Complete any pending mobile signInWithRedirect result
+    void getRedirectResult(firebaseAuth)
+      .then(async (redirectCred) => {
+        if (!isMounted || !redirectCred?.user?.email) return;
+        const idToken = await redirectCred.user.getIdToken();
+        const res = await authService.authenticateFromVerifiedOAuth({
+          uid: redirectCred.user.uid,
+          email: redirectCred.user.email,
+          displayName: redirectCred.user.displayName,
+          idToken,
+          photoUrl: redirectCred.user.photoURL,
+        });
+        if (isMounted) {
+          setUser(res.user);
+          setSession(res.session);
+          setSessionError(null);
+          refreshAvailableUsers();
+          void databaseService.syncUserProfile(res.user).catch((err) => {
+            console.warn('Profile sync warning:', err);
+          });
+        }
+      })
+      .catch((err: unknown) => {
+        console.warn('Redirect sign-in check warning:', err);
+      });
 
     const unsubscribeFirebase = onAuthStateChanged(firebaseAuth, async (fbUser: User | null) => {
       if (!isMounted) return;
@@ -112,46 +140,74 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const loginWithGoogle = async (): Promise<void> => {
     setSessionError(null);
     try {
-      const isAndroidWebView =
+      const isEmbeddedAssetWebView =
         typeof window !== 'undefined' &&
-        (window.location.hostname === 'appassets.androidplatform.net' ||
-          /wv|Version\/\d+\.\d+.*Chrome/.test(navigator.userAgent));
+        window.location.hostname === 'appassets.androidplatform.net';
 
-      if (isAndroidWebView) {
+      if (isEmbeddedAssetWebView) {
         throw new Error(
           'Google OAuth browser popups are blocked inside embedded Android WebView (RFC 8252). Please sign in using Email & Password below.'
         );
       }
 
       const provider = new GoogleAuthProvider();
+      provider.addScope('email');
+      provider.addScope('profile');
       provider.setCustomParameters({ prompt: 'select_account' });
-      const result = await signInWithPopup(firebaseAuth, provider);
-      if (!result.user.email) {
+
+      let result;
+      try {
+        result = await signInWithPopup(firebaseAuth, provider);
+      } catch (popupErr: unknown) {
+        const popupCode = (popupErr as { code?: string })?.code || '';
+        if (
+          popupCode === 'auth/popup-blocked' ||
+          popupCode === 'auth/operation-not-supported-in-this-environment'
+        ) {
+          await signInWithRedirect(firebaseAuth, provider);
+          return;
+        }
+        throw popupErr;
+      }
+
+      const resolvedEmail =
+        result.user.email ||
+        result.user.providerData?.find((p) => p.email)?.email ||
+        null;
+      if (!resolvedEmail) {
         throw new Error('Google OAuth did not return a verified account email.');
       }
       const idToken = await result.user.getIdToken();
       const res = await authService.authenticateFromVerifiedOAuth({
         uid: result.user.uid,
-        email: result.user.email,
-        displayName: result.user.displayName,
+        email: resolvedEmail,
+        displayName:
+          result.user.displayName ||
+          result.user.providerData?.find((p) => p.displayName)?.displayName,
         idToken,
         photoUrl: result.user.photoURL,
       });
       setUser(res.user);
       setSession(res.session);
       refreshAvailableUsers();
-      await databaseService.syncUserProfile(res.user);
+      void databaseService.syncUserProfile(res.user).catch((err) => {
+        console.warn('Profile sync warning:', err);
+      });
     } catch (err: unknown) {
       const code = (err as { code?: string })?.code || '';
       let msg = err instanceof Error ? err.message : 'Google Sign-In failed.';
       if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request') {
         msg = 'Google Sign-In popup was closed before completing authentication.';
-      } else if (
-        code === 'auth/unauthorized-domain' ||
-        code === 'auth/operation-not-supported-in-this-environment'
-      ) {
+      } else if (code === 'auth/unauthorized-domain') {
+        const currentHost =
+          typeof window !== 'undefined' ? window.location.hostname : 'current domain';
+        msg = `Domain "${currentHost}" is not yet authorized in Firebase Authentication -> Settings -> Authorized domains. Please sign in with Email & Password below or add "${currentHost}" to Authorized domains.`;
+      } else if (code === 'auth/operation-not-allowed') {
         msg =
-          'Google OAuth popup is not authorized for this domain in Firebase Console. Please sign in or register using Email & Password below.';
+          'Google Sign-In provider is not enabled in Firebase Console (Authentication -> Sign-in method). Please enable Google Sign-In or use Email & Password below.';
+      } else if (code === 'auth/account-exists-with-different-credential') {
+        msg =
+          'An account already exists with the same email address under a different sign-in method. Please sign in with your Email & Password.';
       }
       setSessionError(msg);
       throw new Error(msg);
