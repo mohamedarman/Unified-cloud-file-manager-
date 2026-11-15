@@ -262,7 +262,13 @@ class QuotaGovernor(
                     }
                     break
                 }
-                waiter.await()
+                try {
+                    waiter.await()
+                } finally {
+                    synchronized(lock) {
+                        waiters.remove(waiter)
+                    }
+                }
                 lastAdmission = tryAcquire(accountId)
                 if (lastAdmission == Admission.Refused(Refusal.RATE_BUDGET_EXHAUSTED)) {
                     break

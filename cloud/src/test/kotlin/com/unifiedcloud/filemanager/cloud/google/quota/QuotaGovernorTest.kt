@@ -1,6 +1,8 @@
 package com.unifiedcloud.filemanager.cloud.google.quota
 
 import com.unifiedcloud.filemanager.domain.model.LocalAccountId
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -349,14 +351,11 @@ class QuotaGovernorTest {
             val governor = governor(perAccount = 1, global = 2)
             assertEquals(Admission.Granted, governor.tryAcquire(alice))
 
-            val gate = CountDownLatch(1)
             val releaser =
-                thread {
-                    gate.await()
-                    Thread.sleep(25)
+                launch {
+                    delay(25L)
                     governor.release(alice)
                 }
-            gate.countDown()
             val result = governor.withQueuedPermit(alice, maxWaitMillis = 2_000L) { "queued-upload-complete" }
             releaser.join()
 
