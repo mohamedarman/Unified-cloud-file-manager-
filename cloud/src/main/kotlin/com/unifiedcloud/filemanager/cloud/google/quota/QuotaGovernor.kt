@@ -242,41 +242,34 @@ class QuotaGovernor(
         maxWaitMillis: Long = DEFAULT_QUEUE_TIMEOUT_MILLIS,
     ): Admission {
         var lastAdmission: Admission = tryAcquire(accountId)
-        if (lastAdmission is Admission.Granted ||
-            lastAdmission == Admission.Refused(Refusal.RATE_BUDGET_EXHAUSTED)
-        ) {
+        if (isTerminalAdmission(lastAdmission)) {
             return lastAdmission
         }
         withTimeoutOrNull(maxWaitMillis) {
-            while (lastAdmission !is Admission.Granted) {
+            while (!isTerminalAdmission(lastAdmission)) {
                 val waiter = CompletableDeferred<Unit>()
                 synchronized(lock) {
                     waiters.addLast(waiter)
                 }
-                lastAdmission = tryAcquire(accountId)
-                if (lastAdmission is Admission.Granted ||
-                    lastAdmission == Admission.Refused(Refusal.RATE_BUDGET_EXHAUSTED)
-                ) {
-                    synchronized(lock) {
-                        waiters.remove(waiter)
-                    }
-                    break
-                }
                 try {
-                    waiter.await()
+                    lastAdmission = tryAcquire(accountId)
+                    if (!isTerminalAdmission(lastAdmission)) {
+                        waiter.await()
+                        lastAdmission = tryAcquire(accountId)
+                    }
                 } finally {
                     synchronized(lock) {
                         waiters.remove(waiter)
                     }
                 }
-                lastAdmission = tryAcquire(accountId)
-                if (lastAdmission == Admission.Refused(Refusal.RATE_BUDGET_EXHAUSTED)) {
-                    break
-                }
             }
         }
         return lastAdmission
     }
+
+    private fun isTerminalAdmission(admission: Admission): Boolean =
+        admission is Admission.Granted ||
+            admission == Admission.Refused(Refusal.RATE_BUDGET_EXHAUSTED)
 
     /** Requests currently in flight for one account. */
     fun inFlightFor(accountId: LocalAccountId): Int =

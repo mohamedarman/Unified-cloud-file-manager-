@@ -20,6 +20,7 @@ import com.unifiedcloud.filemanager.domain.model.LocalAccountId
 import com.unifiedcloud.filemanager.domain.model.ProviderFileId
 import com.unifiedcloud.filemanager.domain.model.ProviderId
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import okhttp3.OkHttpClient
@@ -102,65 +103,94 @@ class CloudSyncWorker(
     ): kotlin.Result<Unit> {
         val localAccountId = LocalAccountId(op.accountId)
         val targetFileId = op.fileId?.takeIf { it.isNotBlank() }?.let(::ProviderFileId)
-        val payloadObj =
-            op.payload?.takeIf { it.isNotBlank() }?.let {
-                runCatching { json.parseToJsonElement(it).jsonObject }.getOrNull()
-            }
+        val payloadObj = parsePayloadObject(op.payload)
 
         return when (op.operation) {
-            PendingOperationDao.OP_RENAME -> {
-                val newName = payloadObj?.get("newName")?.jsonPrimitive?.content.orEmpty()
-                if (targetFileId == null || newName.isBlank()) {
-                    kotlin.Result.failure(IllegalArgumentException("Missing rename arguments"))
-                } else {
-                    provider.rename(localAccountId, targetFileId, newName).map { }
-                }
-            }
-            PendingOperationDao.OP_MOVE -> {
-                val destId = payloadObj?.get("targetParentId")?.jsonPrimitive?.content?.let(::ProviderFileId)
-                if (targetFileId == null) {
-                    kotlin.Result.failure(IllegalArgumentException("Missing fileId for move"))
-                } else {
-                    provider.move(localAccountId, targetFileId, destId).map { }
-                }
-            }
-            PendingOperationDao.OP_COPY -> {
-                val destId = payloadObj?.get("targetParentId")?.jsonPrimitive?.content?.let(::ProviderFileId)
-                if (targetFileId == null) {
-                    kotlin.Result.failure(IllegalArgumentException("Missing fileId for copy"))
-                } else {
-                    provider.copy(localAccountId, targetFileId, destId).map { }
-                }
-            }
+            PendingOperationDao.OP_RENAME ->
+                dispatchRename(provider, localAccountId, targetFileId, payloadObj)
+            PendingOperationDao.OP_MOVE ->
+                dispatchMoveOrCopy(provider, localAccountId, targetFileId, payloadObj, isMove = true)
+            PendingOperationDao.OP_COPY ->
+                dispatchMoveOrCopy(provider, localAccountId, targetFileId, payloadObj, isMove = false)
             PendingOperationDao.OP_TRASH ->
-                if (targetFileId == null) {
-                    kotlin.Result.failure(IllegalArgumentException("Missing fileId for trash"))
-                } else {
-                    provider.trash(localAccountId, targetFileId)
-                }
+                requireTargetFile(targetFileId, "trash") { provider.trash(localAccountId, it) }
             PendingOperationDao.OP_RESTORE ->
-                if (targetFileId == null) {
-                    kotlin.Result.failure(IllegalArgumentException("Missing fileId for restore"))
-                } else {
-                    provider.restore(localAccountId, targetFileId)
-                }
+                requireTargetFile(targetFileId, "restore") { provider.restore(localAccountId, it) }
             PendingOperationDao.OP_DELETE_PERMANENTLY ->
-                if (targetFileId == null) {
-                    kotlin.Result.failure(IllegalArgumentException("Missing fileId for delete"))
-                } else {
-                    provider.deletePermanently(localAccountId, targetFileId)
+                requireTargetFile(targetFileId, "delete") {
+                    provider.deletePermanently(localAccountId, it)
                 }
-            PendingOperationDao.OP_CREATE_FOLDER -> {
-                val name = payloadObj?.get("name")?.jsonPrimitive?.content.orEmpty()
-                if (name.isBlank()) {
-                    kotlin.Result.failure(IllegalArgumentException("Missing folder name"))
-                } else {
-                    provider.createFolder(localAccountId, targetFileId, name).map { }
-                }
-            }
-            else -> kotlin.Result.failure(IllegalStateException("Unsupported background operation ${op.operation}"))
+            PendingOperationDao.OP_CREATE_FOLDER ->
+                dispatchCreateFolder(provider, localAccountId, targetFileId, payloadObj)
+            else ->
+                kotlin.Result.failure(
+                    IllegalStateException("Unsupported background operation ${op.operation}"),
+                )
         }
     }
+
+    private fun parsePayloadObject(rawPayload: String?) =
+        rawPayload?.takeIf { it.isNotBlank() }?.let {
+            runCatching { json.parseToJsonElement(it).jsonObject }.getOrNull()
+        }
+
+    private suspend fun dispatchRename(
+        provider: HttpCloudProvider,
+        accountId: LocalAccountId,
+        targetFileId: ProviderFileId?,
+        payloadObj: JsonObject?,
+    ): kotlin.Result<Unit> {
+        val newName = payloadObj?.get("newName")?.jsonPrimitive?.content.orEmpty()
+        if (targetFileId == null || newName.isBlank()) {
+            return kotlin.Result.failure(IllegalArgumentException("Missing rename arguments"))
+        }
+        return provider.rename(accountId, targetFileId, newName).map { }
+    }
+
+    private suspend fun dispatchMoveOrCopy(
+        provider: HttpCloudProvider,
+        accountId: LocalAccountId,
+        targetFileId: ProviderFileId?,
+        payloadObj: JsonObject?,
+        isMove: Boolean,
+    ): kotlin.Result<Unit> {
+        if (targetFileId == null) {
+            val action = if (isMove) "move" else "copy"
+            return kotlin.Result.failure(IllegalArgumentException("Missing fileId for $action"))
+        }
+        val destId = payloadObj?.get("targetParentId")?.jsonPrimitive?.content?.let(::ProviderFileId)
+        val result =
+            if (isMove) {
+                provider.move(accountId, targetFileId, destId)
+            } else {
+                provider.copy(accountId, targetFileId, destId)
+            }
+        return result.map { }
+    }
+
+    private suspend fun dispatchCreateFolder(
+        provider: HttpCloudProvider,
+        accountId: LocalAccountId,
+        parentFolderId: ProviderFileId?,
+        payloadObj: JsonObject?,
+    ): kotlin.Result<Unit> {
+        val name = payloadObj?.get("name")?.jsonPrimitive?.content.orEmpty()
+        if (name.isBlank()) {
+            return kotlin.Result.failure(IllegalArgumentException("Missing folder name"))
+        }
+        return provider.createFolder(accountId, parentFolderId, name).map { }
+    }
+
+    private inline fun requireTargetFile(
+        targetFileId: ProviderFileId?,
+        action: String,
+        block: (ProviderFileId) -> kotlin.Result<Unit>,
+    ): kotlin.Result<Unit> =
+        if (targetFileId == null) {
+            kotlin.Result.failure(IllegalArgumentException("Missing fileId for $action"))
+        } else {
+            block(targetFileId)
+        }
 
     private fun createForegroundInfo(): ForegroundInfo {
         ensureNotificationChannel()

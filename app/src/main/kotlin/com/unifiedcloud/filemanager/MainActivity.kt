@@ -210,7 +210,6 @@ private data class WebViewCallbacks(
     ) -> Boolean,
 )
 
-@SuppressLint("SetJavaScriptEnabled")
 @Suppress("FunctionName", "ktlint:standard:function-naming")
 @Composable
 fun AppWebView(
@@ -233,39 +232,29 @@ fun AppWebView(
                 .fillMaxSize()
                 .background(Color(BACKGROUND_COLOR_HEX)),
     ) {
-        key(recreateGeneration) {
-            AndroidView(
-                modifier = Modifier.fillMaxSize(),
-                factory = { context ->
-                    val callbacks =
-                        WebViewCallbacks(
-                            onFinished = {
-                                isLoading = false
-                                canNavigateBack = webViewInstance?.canGoBack() == true
-                            },
-                            onError = { error ->
-                                loadError = error
-                                isLoading = false
-                            },
-                            onRendererCrashed = {
-                                Log.w(TAG, "WebView renderer process gone; recreating WebView")
-                                isLoading = true
-                                loadError = null
-                                recreateGeneration++
-                            },
-                            onLaunchFileChooser = onLaunchFileChooser,
-                        )
-                    createWebView(
-                        context = context,
-                        nativeBridge = nativeBridge,
-                        callbacks = callbacks,
-                    ).also { webView ->
-                        webViewInstance = webView
-                        webView.loadUrl(APP_URL)
-                    }
-                },
-            )
-        }
+        WebViewHost(
+            recreateGeneration = recreateGeneration,
+            nativeBridge = nativeBridge,
+            callbacks =
+                WebViewCallbacks(
+                    onFinished = {
+                        isLoading = false
+                        canNavigateBack = webViewInstance?.canGoBack() == true
+                    },
+                    onError = { error ->
+                        loadError = error
+                        isLoading = false
+                    },
+                    onRendererCrashed = {
+                        Log.w(TAG, "WebView renderer process gone; recreating WebView")
+                        isLoading = true
+                        loadError = null
+                        recreateGeneration++
+                    },
+                    onLaunchFileChooser = onLaunchFileChooser,
+                ),
+            onWebViewCreated = { webViewInstance = it },
+        )
 
         if (isLoading && loadError == null) {
             LoadingOverlay()
@@ -278,6 +267,31 @@ fun AppWebView(
                 webViewInstance?.loadUrl(APP_URL)
             }
         }
+    }
+}
+
+@Suppress("FunctionName", "ktlint:standard:function-naming")
+@Composable
+private fun WebViewHost(
+    recreateGeneration: Int,
+    nativeBridge: NativeCloudBridge,
+    callbacks: WebViewCallbacks,
+    onWebViewCreated: (WebView) -> Unit,
+) {
+    key(recreateGeneration) {
+        AndroidView(
+            modifier = Modifier.fillMaxSize(),
+            factory = { context ->
+                createWebView(
+                    context = context,
+                    nativeBridge = nativeBridge,
+                    callbacks = callbacks,
+                ).also { webView ->
+                    onWebViewCreated(webView)
+                    webView.loadUrl(APP_URL)
+                }
+            },
+        )
     }
 }
 
