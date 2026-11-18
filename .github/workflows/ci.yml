@@ -93,7 +93,7 @@ jobs:
 
       - name: Upload lint report
         if: always()
-        uses: actions/upload-artifact@v4.6.0
+        uses: actions/upload-artifact@v7.0.2
         with:
           name: lint-report
           path: app/build/reports/lint-results-debug.html
@@ -101,7 +101,7 @@ jobs:
 
       - name: Upload detekt report
         if: failure()
-        uses: actions/upload-artifact@v4.6.0
+        uses: actions/upload-artifact@v7.0.2
         with:
           name: detekt-report
           path: '**/build/reports/detekt/**'
@@ -138,7 +138,7 @@ jobs:
 
       - name: Upload test reports
         if: always()
-        uses: actions/upload-artifact@v4.6.0
+        uses: actions/upload-artifact@v7.0.2
         with:
           name: unit-test-reports
           path: '**/build/reports/tests/**/*.html'
@@ -231,7 +231,7 @@ jobs:
 
       - name: Upload reports
         if: always()
-        uses: actions/upload-artifact@v4.6.0
+        uses: actions/upload-artifact@v7.0.2
         with:
           name: instrumented-reports
           path: '**/build/reports/androidTests/**'
